@@ -68,7 +68,7 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				journal: {
-					paper: '#F0F8FF',
+					paper: '#FFFCF8',
 					ink: '#222222',
 					accent: '#A0A0A0',
 					highlight: '#E9E5E0',
