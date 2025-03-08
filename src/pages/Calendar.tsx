@@ -54,7 +54,7 @@ const CalendarPage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Calendar */}
-          <Card className="p-4">
+          <Card className="p-4 flex items-center justify-center">
             <Calendar
               mode="single"
               selected={date}
@@ -64,19 +64,19 @@ const CalendarPage = () => {
           </Card>
 
           {/* Entries for selected date */}
-          <Card className="p-4">
-            <div className="mb-4">
+          <Card className="p-4 flex flex-col">
+            <div className="mb-4 text-center">
               <h2 className="text-lg font-serif">
                 Entries for {date ? formatDate(date) : 'Selected Date'}
               </h2>
             </div>
             
-            <ScrollArea className="h-[400px] pr-4">
+            <ScrollArea className="h-[400px] pr-4 flex-1">
               {selectedDateEntries.length > 0 ? (
                 <div className="space-y-4">
                   {selectedDateEntries.map(entry => (
                     <Card key={entry.id} className="p-4 hover:shadow-md transition-shadow">
-                      <h3 className="font-serif mb-2">{entry.title}</h3>
+                      <h3 className="font-serif mb-2 text-center">{entry.title}</h3>
                       <p className="text-sm text-gray-600 line-clamp-3">
                         {entry.content}
                       </p>
@@ -84,7 +84,7 @@ const CalendarPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 font-serif">
+                <div className="text-center py-8 font-serif flex items-center justify-center h-full">
                   {date ? 'No entries for this date' : 'Select a date to view entries'}
                 </div>
               )}
