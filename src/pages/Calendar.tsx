@@ -1,42 +1,57 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
 import { pageVariants } from '@/components/animations/PageTransition';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDate } from '@/utils/dateUtils';
+import BackButton from '@/components/BackButton';
+import { useToast } from '@/components/ui/use-toast';
 
-// Temporary mock data for entries
-const mockEntries = [
-  {
-    id: 1,
-    title: "Morning Reflection",
-    content: "Today started with a beautiful sunrise...",
-    date: new Date(2024, 2, 8),
-  },
-  {
-    id: 2,
-    title: "Project Ideas",
-    content: "Brainstormed some new features for the app...",
-    date: new Date(2024, 2, 8),
-  },
-  {
-    id: 3,
-    title: "Evening Thoughts",
-    content: "Reflecting on today's achievements...",
-    date: new Date(2024, 2, 7),
-  },
-];
+interface Entry {
+  id: number;
+  title: string;
+  content: string;
+  date: Date;
+}
 
 const CalendarPage = () => {
   const [date, setDate] = React.useState<Date | undefined>(new Date());
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const { toast } = useToast();
   
+  useEffect(() => {
+    // Load entries from localStorage
+    const savedEntries = JSON.parse(localStorage.getItem('journal-entries') || '[]');
+    const entriesWithDates = savedEntries.map((entry: any) => ({
+      ...entry,
+      date: new Date(entry.date)
+    }));
+    setEntries(entriesWithDates);
+  }, []);
+
   // Filter entries for selected date
-  const selectedDateEntries = mockEntries.filter(entry => 
+  const selectedDateEntries = entries.filter(entry => 
     date && entry.date.toDateString() === date.toDateString()
   );
+
+  const handleDeleteEntry = (entryId: number) => {
+    // Filter out the deleted entry
+    const updatedEntries = entries.filter(entry => entry.id !== entryId);
+    
+    // Update state
+    setEntries(updatedEntries);
+    
+    // Save to localStorage
+    localStorage.setItem('journal-entries', JSON.stringify(updatedEntries));
+
+    toast({
+      title: "Entry deleted",
+      description: "The entry has been permanently deleted",
+    });
+  };
 
   return (
     <Layout>
@@ -48,6 +63,7 @@ const CalendarPage = () => {
         exit="exit"
       >
         <div className="flex items-center mb-6">
+          <BackButton className="mr-3" />
           <CalendarIcon className="mr-2 h-8 w-8" />
           <h1 className="text-2xl font-serif">Calendar View</h1>
         </div>
@@ -76,7 +92,16 @@ const CalendarPage = () => {
                 <div className="space-y-4">
                   {selectedDateEntries.map(entry => (
                     <Card key={entry.id} className="p-4 hover:shadow-md transition-shadow">
-                      <h3 className="font-serif mb-2 text-center">{entry.title}</h3>
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-serif mb-2">{entry.title}</h3>
+                        <button
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          className="p-1.5 text-gray-500 hover:text-red-500 rounded-full hover:bg-red-50 transition-colors"
+                          aria-label="Delete entry"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                       <p className="text-sm text-gray-600 line-clamp-3">
                         {entry.content}
                       </p>

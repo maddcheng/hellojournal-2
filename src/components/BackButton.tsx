@@ -1,8 +1,6 @@
-
 import React from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface BackButtonProps {
@@ -12,22 +10,17 @@ interface BackButtonProps {
 const BackButton: React.FC<BackButtonProps> = ({ className }) => {
   const navigate = useNavigate();
 
-  const handleBack = () => {
-    navigate(-1);
-  };
-
   return (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      onClick={handleBack}
+    <button
+      onClick={() => navigate(-1)}
       className={cn(
-        "p-2 rounded-md hover:bg-gray-100 focus-ring transition-colors",
+        "p-2 rounded-full hover:bg-gray-100 transition-colors focus-ring",
         className
       )}
       aria-label="Go back"
     >
-      <ArrowLeft size={20} className="text-gray-600" />
-    </motion.button>
+      <ChevronLeft className="h-5 w-5" />
+    </button>
   );
 };
 
