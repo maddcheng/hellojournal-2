@@ -1,9 +1,9 @@
-
 import React, { ReactNode, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, Menu, Book, Calendar, Settings } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Link, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: ReactNode;
@@ -38,9 +38,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, className }) => {
               </div>
 
               <nav className="space-y-1 flex-1">
-                <SidebarLink icon={Book} label="Entries" active />
-                <SidebarLink icon={Calendar} label="Calendar" />
-                <SidebarLink icon={Settings} label="Settings" />
+                <SidebarLink icon={Book} label="Entries" to="/" />
+                <SidebarLink icon={Calendar} label="Calendar" to="/calendar" />
+                <SidebarLink icon={Settings} label="Settings" to="/settings" />
               </nav>
 
               <div className="pt-4 border-t border-gray-200">
@@ -91,22 +91,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, className }) => {
 interface SidebarLinkProps {
   icon: React.ElementType;
   label: string;
-  active?: boolean;
+  to: string;
 }
 
-const SidebarLink: React.FC<SidebarLinkProps> = ({ icon: Icon, label, active }) => {
+const SidebarLink: React.FC<SidebarLinkProps> = ({ icon: Icon, label, to }) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
   return (
-    <a
-      href="#"
+    <Link
+      to={to}
       className={cn(
         "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
-        active 
-          ? "bg-gray-100 text-gray-900" 
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        isActive
+          ? "bg-black text-white"
+          : "text-gray-700 hover:bg-gray-100"
       )}
     >
-      <Icon size={18} className="mr-3" />
-      <span>{label}</span>
-    </a>
+      <Icon size={18} className="mr-2" />
+      {label}
+    </Link>
   );
 };
