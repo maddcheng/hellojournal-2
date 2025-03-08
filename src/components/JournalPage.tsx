@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { formatDate, formatTime } from '@/utils/dateUtils';
 import { pageVariants } from './animations/PageTransition';
 import { JournalPrompt } from './JournalPrompt';
 import { PenLine } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
 interface JournalPageProps {
@@ -18,6 +18,23 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
   const currentDate = new Date();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if we have a draft to load
+    const draft = location.state?.draft;
+    if (draft) {
+      setTitle(draft.title || '');
+      setContent(draft.content || '');
+      if (draft.prompt) {
+        setSavedPrompt(draft.prompt);
+      }
+      toast({
+        title: "Draft loaded successfully",
+        description: "You can continue editing your entry",
+      });
+    }
+  }, [location.state]);
 
   const handleSelectPrompt = (prompt: string) => {
     setSavedPrompt(prompt);
@@ -120,7 +137,7 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
             </div>
           </div>
 
-          <JournalPrompt onSelectPrompt={handleSelectPrompt} />
+          {!location.state?.draft && <JournalPrompt onSelectPrompt={handleSelectPrompt} />}
 
           <div className="space-y-4">
             <div>

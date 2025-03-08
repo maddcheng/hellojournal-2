@@ -22,6 +22,7 @@ export const EntryList: React.FC<EntryListProps> = ({ onSelectEntry, className }
   useEffect(() => {
     // Load entries from localStorage
     const savedEntries = JSON.parse(localStorage.getItem('journal-entries') || '[]');
+    console.log('Loaded entries:', savedEntries); // Debug log
     // Convert string dates back to Date objects
     const entriesWithDates = savedEntries.map((entry: any) => ({
       ...entry,

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
@@ -7,7 +7,7 @@ import { pageVariants } from '@/components/animations/PageTransition';
 import { formatDate } from '@/utils/dateUtils';
 import BackButton from '@/components/BackButton';
 import { Save } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
 const DrawJournal = () => {
@@ -17,7 +17,33 @@ const DrawJournal = () => {
   const canvasRef = useRef<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const location = useLocation();
   
+  useEffect(() => {
+    // Check if we have a draft to load
+    const draft = location.state?.draft;
+    if (draft && canvasRef.current) {
+      try {
+        const canvasData = JSON.parse(draft.content);
+        canvasRef.current.loadFromJSON(canvasData, () => {
+          setMode('draw');
+          setCustomPrompt(draft.title);
+          toast({
+            title: "Draft loaded successfully",
+            description: "You can continue editing your drawing",
+          });
+        });
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        toast({
+          title: "Error loading draft",
+          description: "There was a problem loading your draft",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [location.state, canvasRef.current]);
+
   const handleSelectTemplate = (template: TemplateType, customPrompt?: string) => {
     setSelectedTemplate(template);
     setCustomPrompt(customPrompt);

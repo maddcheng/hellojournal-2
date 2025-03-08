@@ -22,6 +22,7 @@ const DraftsPage = () => {
   useEffect(() => {
     // Load drafts from localStorage
     const savedDrafts = JSON.parse(localStorage.getItem('journal-drafts') || '[]');
+    console.log('Loaded drafts:', savedDrafts); // Debug log
     // Convert string dates back to Date objects
     const draftsWithDates = savedDrafts.map((draft: any) => ({
       ...draft,
@@ -31,9 +32,14 @@ const DraftsPage = () => {
   }, []);
 
   const handleDraftClick = (draft: Draft) => {
-    // TODO: Implement draft editing
-    // For now, just navigate to draw page
-    navigate('/draw');
+    // Check if it's a canvas draft or text draft
+    if (draft.content.startsWith('{') && draft.content.includes('"objects":')) {
+      // It's a canvas draft
+      navigate('/draw', { state: { draft } });
+    } else {
+      // It's a text draft
+      navigate('/', { state: { draft } });
+    }
   };
 
   return (
@@ -67,7 +73,9 @@ const DraftsPage = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 line-clamp-2">
-                      Draft saved on {formatDate(draft.lastModified)}
+                      {draft.content.startsWith('{') && draft.content.includes('"objects":')
+                        ? 'Canvas drawing'
+                        : draft.content}
                     </p>
                   </Card>
                 ))}
