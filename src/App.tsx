@@ -9,6 +9,7 @@ import DrawJournal from "./pages/DrawJournal";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import CalendarPage from "./pages/Calendar";
+import DraftsPage from "./pages/Drafts";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/draw" element={<DrawJournal />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/drafts" element={<DraftsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

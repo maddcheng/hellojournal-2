@@ -1,7 +1,7 @@
 import React, { ReactNode, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, Menu, Book, Calendar, Settings, Home, PenLine } from 'lucide-react';
+import { ChevronLeft, Menu, Book, Calendar, Settings, Home, PenLine, FileEdit } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -40,6 +40,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, className }) => {
               <nav className="space-y-1 flex-1">
                 <SidebarLink icon={Book} label="Entries" to="/" />
                 <SidebarLink icon={Calendar} label="Calendar" to="/calendar" />
+                <SidebarLink icon={FileEdit} label="Drafts" to="/drafts" />
                 <SidebarLink icon={Settings} label="Settings" to="/settings" />
               </nav>
 
