@@ -26,3 +26,18 @@ export const getRandomPrompt = (): string => {
   const randomIndex = Math.floor(Math.random() * journalPrompts.length);
   return journalPrompts[randomIndex];
 };
+
+// Template prompts for the AI generator
+export const templatePrompts = {
+  monthly: "Create a monthly planner template with dates, goals section, and habit tracker.",
+  weekly: "Design a weekly planner with days of the week, priorities section, and notes area.",
+  daily: "Generate a daily planner with schedule, tasks, priorities, and reflection section.",
+  bullet: "Create a bullet journal spread with index, future log, and collections.",
+  cornell: "Design a Cornell note-taking template with cue column, notes section, and summary area.",
+  blank: "Create a minimal blank page with subtle guidelines.",
+};
+
+export const getTemplatePrompt = (templateType: string): string => {
+  return templatePrompts[templateType as keyof typeof templatePrompts] || 
+    "Create a journal template based on user requirements.";
+};
