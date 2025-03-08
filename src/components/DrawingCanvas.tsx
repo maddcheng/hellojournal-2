@@ -269,249 +269,263 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      <div className="drawing-toolbar mb-4 flex items-center space-x-2 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm flex-wrap">
-        <ToolButton 
-          active={tool === 'pen'}
-          onClick={() => handleToolChange('pen')}
-          icon={<PenLine size={18} />}
-          title="Pen"
-        />
-        <ToolButton 
-          active={tool === 'eraser'}
-          onClick={() => handleToolChange('eraser')}
-          icon={<Eraser size={18} />}
-          title="Eraser"
-        />
-        
-        <div className="h-8 mx-1 border-r border-gray-200"></div>
-        
-        <Popover open={showColorPicker} onOpenChange={setShowColorPicker}>
-          <PopoverTrigger asChild>
-            <div>
-              <ToolButton 
-                onClick={() => {}}
-                icon={<div className="w-4 h-4 rounded-full" style={{ backgroundColor: penColor }} />}
-                title="Color"
-              />
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-4">
-            <div className="space-y-4">
-              <HSBColorPicker value={penColor} onChange={setPenColor} />
-              
-              <div className="space-y-2">
-                <Label>Stroke Width</Label>
-                <div className="flex items-center space-x-2">
-                  <Slider
-                    value={[strokeWidth]}
-                    onValueChange={([value]) => {
-                      setStrokeWidth(value);
-                      setBrushSize(value);
-                    }}
-                    min={1}
-                    max={50}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-sm text-right">{strokeWidth}px</span>
+      <div className="drawing-toolbar mb-4 flex items-center gap-2 p-4 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm flex-wrap justify-center">
+        {/* Drawing Tools Group */}
+        <div className="flex items-center gap-2">
+          <ToolButton 
+            active={tool === 'pen'}
+            onClick={() => handleToolChange('pen')}
+            icon={<PenLine size={18} />}
+            title="Pen"
+          />
+          <ToolButton 
+            active={tool === 'eraser'}
+            onClick={() => handleToolChange('eraser')}
+            icon={<Eraser size={18} />}
+            title="Eraser"
+          />
+          
+          {/* Color and Stroke Width */}
+          <Popover open={showColorPicker} onOpenChange={setShowColorPicker}>
+            <PopoverTrigger asChild>
+              <div>
+                <ToolButton 
+                  active={showColorPicker}
+                  onClick={() => {}}
+                  icon={<div className="w-4 h-4 rounded-full border border-gray-200" style={{ backgroundColor: penColor }} />}
+                  title="Color & Width"
+                />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4">
+              <div className="space-y-4">
+                <HSBColorPicker value={penColor} onChange={setPenColor} />
+                
+                <div className="space-y-2">
+                  <Label>Stroke Width</Label>
+                  <div className="flex items-center space-x-2">
+                    <Slider
+                      value={[strokeWidth]}
+                      onValueChange={([value]) => {
+                        setStrokeWidth(value);
+                        setBrushSize(value);
+                      }}
+                      min={1}
+                      max={50}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-sm text-right">{strokeWidth}px</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Popover open={showTextOptions} onOpenChange={setShowTextOptions}>
-          <PopoverTrigger asChild>
-            <div>
-              <ToolButton 
-                active={tool === 'text'}
-                onClick={() => handleToolChange('text')}
-                icon={<Type size={18} />}
-                title="Text"
-              />
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Font Family</Label>
-                <Select
-                  value={textOptions.fontFamily}
-                  onValueChange={(value) => setTextOptions(prev => ({ ...prev, fontFamily: value }))}
-                >
-                  {fontOptions.map(font => (
-                    <option key={font} value={font}>{font}</option>
-                  ))}
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Font Size</Label>
-                <Input
-                  type="number"
-                  value={textOptions.fontSize}
-                  onChange={(e) => setTextOptions(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                  min={8}
-                  max={72}
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="h-8 mx-1 border-r border-gray-200"></div>
+
+        {/* Text and Image Tools Group */}
+        <div className="flex items-center gap-2">
+          <Popover open={showTextOptions} onOpenChange={setShowTextOptions}>
+            <PopoverTrigger asChild>
+              <div>
+                <ToolButton 
+                  active={tool === 'text'}
+                  onClick={() => handleToolChange('text')}
+                  icon={<Type size={18} />}
+                  title="Text"
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input
-                  type="color"
-                  value={textOptions.fill}
-                  onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
-                />
-              </div>
-              
-              <div className="flex space-x-2">
-                <Button
-                  variant={textOptions.fontWeight === 'bold' ? 'default' : 'outline'}
-                  onClick={() => setTextOptions(prev => ({ 
-                    ...prev, 
-                    fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' 
-                  }))}
-                >
-                  B
-                </Button>
-                <Button
-                  variant={textOptions.fontStyle === 'italic' ? 'default' : 'outline'}
-                  onClick={() => setTextOptions(prev => ({ 
-                    ...prev, 
-                    fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' 
-                  }))}
-                >
-                  I
-                </Button>
-                <Button
-                  variant={textOptions.underline ? 'default' : 'outline'}
-                  onClick={() => setTextOptions(prev => ({ 
-                    ...prev, 
-                    underline: !prev.underline 
-                  }))}
-                >
-                  U
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Text Alignment</Label>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Font Family</Label>
+                  <Select
+                    value={textOptions.fontFamily}
+                    onValueChange={(value) => setTextOptions(prev => ({ ...prev, fontFamily: value }))}
+                  >
+                    {fontOptions.map(font => (
+                      <option key={font} value={font}>{font}</option>
+                    ))}
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Font Size</Label>
+                  <Input
+                    type="number"
+                    value={textOptions.fontSize}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                    min={8}
+                    max={72}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Color</Label>
+                  <Input
+                    type="color"
+                    value={textOptions.fill}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
+                  />
+                </div>
+                
                 <div className="flex space-x-2">
                   <Button
-                    variant={textOptions.textAlign === 'left' ? 'default' : 'outline'}
-                    onClick={() => handleTextAlignment('left')}
+                    variant={textOptions.fontWeight === 'bold' ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' 
+                    }))}
                   >
-                    <AlignLeft size={16} />
+                    B
                   </Button>
                   <Button
-                    variant={textOptions.textAlign === 'center' ? 'default' : 'outline'}
-                    onClick={() => handleTextAlignment('center')}
+                    variant={textOptions.fontStyle === 'italic' ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' 
+                    }))}
                   >
-                    <AlignCenter size={16} />
+                    I
                   </Button>
                   <Button
-                    variant={textOptions.textAlign === 'right' ? 'default' : 'outline'}
-                    onClick={() => handleTextAlignment('right')}
+                    variant={textOptions.underline ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      underline: !prev.underline 
+                    }))}
                   >
-                    <AlignRight size={16} />
+                    U
                   </Button>
                 </div>
+                
+                <div className="space-y-2">
+                  <Label>Text Alignment</Label>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant={textOptions.textAlign === 'left' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('left')}
+                    >
+                      <AlignLeft size={16} />
+                    </Button>
+                    <Button
+                      variant={textOptions.textAlign === 'center' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('center')}
+                    >
+                      <AlignCenter size={16} />
+                    </Button>
+                    <Button
+                      variant={textOptions.textAlign === 'right' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('right')}
+                    >
+                      <AlignRight size={16} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Opacity</Label>
+                  <Slider
+                    value={[textOptions.opacity || 1]}
+                    onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Background Color</Label>
+                  <Input
+                    type="color"
+                    value={textOptions.backgroundColor || 'transparent'}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                  />
+                </div>
+                
+                <div className="flex justify-end">
+                  <Button onClick={handleTextAdd}>Add Text</Button>
+                </div>
               </div>
-              
-              <div className="space-y-2">
-                <Label>Opacity</Label>
-                <Slider
-                  value={[textOptions.opacity || 1]}
-                  onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Background Color</Label>
-                <Input
-                  type="color"
-                  value={textOptions.backgroundColor || 'transparent'}
-                  onChange={(e) => setTextOptions(prev => ({ ...prev, backgroundColor: e.target.value }))}
-                />
-              </div>
-              
-              <div className="flex justify-end">
-                <Button onClick={handleTextAdd}>Add Text</Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleImageUpload}
-        />
-        <ToolButton 
-          onClick={() => fileInputRef.current?.click()}
-          icon={<ImageIcon size={18} />}
-          title="Import Image"
-        />
-        
-        <ToolButton 
-          active={tool === 'lasso'}
-          onClick={() => handleToolChange('lasso')}
-          icon={<Lasso size={18} />}
-          title="Select"
-        />
-        
+            </PopoverContent>
+          </Popover>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          <ToolButton 
+            onClick={() => fileInputRef.current?.click()}
+            icon={<ImageIcon size={18} />}
+            title="Import Image"
+          />
+        </div>
+
         <div className="h-8 mx-1 border-r border-gray-200"></div>
-        <ToolButton 
-          onClick={() => handleRotate(false)}
-          icon={<RotateCcw size={18} />}
-          title="Rotate Left"
-        />
-        <ToolButton 
-          onClick={() => handleRotate(true)}
-          icon={<RotateCw size={18} />}
-          title="Rotate Right"
-        />
-        <ToolButton 
-          onClick={() => handleResize(true)}
-          icon={<ZoomIn size={18} />}
-          title="Scale Up"
-        />
-        <ToolButton 
-          onClick={() => handleResize(false)}
-          icon={<ZoomOut size={18} />}
-          title="Scale Down"
-        />
-        
+
+        {/* Selection and Transform Tools Group */}
+        <div className="flex items-center gap-2">
+          <ToolButton 
+            active={tool === 'lasso'}
+            onClick={() => handleToolChange('lasso')}
+            icon={<Lasso size={18} />}
+            title="Select"
+          />
+          <ToolButton 
+            onClick={() => handleRotate(false)}
+            icon={<RotateCcw size={18} />}
+            title="Rotate Left"
+          />
+          <ToolButton 
+            onClick={() => handleRotate(true)}
+            icon={<RotateCw size={18} />}
+            title="Rotate Right"
+          />
+          <ToolButton 
+            onClick={() => handleResize(true)}
+            icon={<ZoomIn size={18} />}
+            title="Scale Up"
+          />
+          <ToolButton 
+            onClick={() => handleResize(false)}
+            icon={<ZoomOut size={18} />}
+            title="Scale Down"
+          />
+        </div>
+
         <div className="h-8 mx-1 border-r border-gray-200"></div>
-        <ToolButton 
-          onClick={handleDelete}
-          icon={<Trash2 size={18} />}
-          title="Delete Selected"
-        />
-        <ToolButton 
-          onClick={handleUndo}
-          disabled={!canUndo}
-          icon={<Undo size={18} />}
-          title="Undo"
-        />
-        <ToolButton 
-          onClick={handleRedo}
-          disabled={!canRedo}
-          icon={<Redo size={18} />}
-          title="Redo"
-        />
-        <div className="h-8 mx-1 border-r border-gray-200"></div>
-        <ToolButton 
-          onClick={handleSave}
-          icon={<Save size={18} />}
-          title="Save as Image"
-        />
+
+        {/* History and Save Tools Group */}
+        <div className="flex items-center gap-2">
+          <ToolButton 
+            onClick={handleDelete}
+            icon={<Trash2 size={18} />}
+            title="Delete Selected"
+          />
+          <ToolButton 
+            onClick={handleUndo}
+            disabled={!canUndo}
+            icon={<Undo size={18} />}
+            title="Undo"
+          />
+          <ToolButton 
+            onClick={handleRedo}
+            disabled={!canRedo}
+            icon={<Redo size={18} />}
+            title="Redo"
+          />
+          <ToolButton 
+            onClick={handleSave}
+            icon={<Save size={18} />}
+            title="Save Entry"
+          />
+        </div>
       </div>
       
       {/* Save Dialog */}

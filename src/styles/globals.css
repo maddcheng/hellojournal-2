@@ -1,3 +1,20 @@
+/* Drawing Toolbar Styles */
+.drawing-toolbar {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.drawing-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.drawing-toolbar > div {
+  flex-shrink: 0;
+}
+
 /* HSB Color Picker Styles */
 .hue-slider .relative::before {
   content: '';
