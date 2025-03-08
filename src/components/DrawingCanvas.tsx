@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Canvas, IEvent, PencilBrush } from 'fabric';
+import { Canvas, TEvent, PencilBrush } from 'fabric';
 import { PenLine, Eraser, Undo, Redo, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -121,7 +121,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     // Convert canvas to image
     const dataURL = canvas.toDataURL({
       format: 'png',
-      quality: 1
+      quality: 1,
+      multiplier: 1 // Add the required multiplier property
     });
     
     // Create a temporary link and trigger download
