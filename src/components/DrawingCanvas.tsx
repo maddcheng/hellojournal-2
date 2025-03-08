@@ -1,5 +1,4 @@
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Canvas, TEvent } from 'fabric';
 import { PenLine, Eraser, Undo, Redo, Save, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,11 +17,11 @@ interface DrawingCanvasProps {
   className?: string;
 }
 
-export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
+export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   width = 600,
   height = 800,
   className,
-}) => {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
@@ -33,6 +32,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Expose canvas instance through ref
+  useImperativeHandle(ref, () => canvas, [canvas]);
 
   // Predefined colors
   const colorOptions = [
@@ -204,4 +206,4 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       </div>
     </div>
   );
-};
+});
