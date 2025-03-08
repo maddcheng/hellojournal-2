@@ -1,9 +1,15 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Canvas, TEvent, PencilBrush } from 'fabric';
+import { Canvas, TEvent } from 'fabric';
 import { PenLine, Eraser, Undo, Redo, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ToolButton } from './drawing/ToolButton';
+import { 
+  initializeCanvas, 
+  updateBrush, 
+  saveCanvasAsImage, 
+  loadCanvasFromJSON 
+} from '@/utils/canvasOperations';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -29,20 +35,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const fabricCanvas = new Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: "#f9f8f4", // Journal paper color
-      isDrawingMode: true,
-    });
-    
+    const fabricCanvas = initializeCanvas(canvasRef.current, width, height);
     setCanvas(fabricCanvas);
-    
-    // Initialize brush
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = "#000000";
-      fabricCanvas.freeDrawingBrush.width = brushSize;
-    }
     
     // Canvas event listeners for history management
     fabricCanvas.on('object:added', () => {
@@ -66,21 +60,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   // Update brush when tool/size changes
   useEffect(() => {
     if (!canvas) return;
-    
-    if (tool === 'pen') {
-      const pencilBrush = new PencilBrush(canvas);
-      pencilBrush.color = "#000000";
-      pencilBrush.width = brushSize;
-      canvas.freeDrawingBrush = pencilBrush;
-    } else if (tool === 'eraser') {
-      // For eraser, we use a white brush
-      const eraserBrush = new PencilBrush(canvas);
-      eraserBrush.color = "#f9f8f4";
-      eraserBrush.width = brushSize * 2; // Make eraser a bit larger
-      canvas.freeDrawingBrush = eraserBrush;
-    }
-    
-    canvas.isDrawingMode = true;
+    updateBrush(canvas, tool, brushSize);
   }, [tool, brushSize, canvas]);
 
   const handleUndo = () => {
@@ -94,9 +74,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       setCanUndo(false);
     }
     
-    canvas.loadFromJSON(history[newIndex], () => {
-      canvas.renderAll();
-    });
+    loadCanvasFromJSON(canvas, history[newIndex]);
   };
 
   const handleRedo = () => {
@@ -110,26 +88,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       setCanRedo(false);
     }
     
-    canvas.loadFromJSON(history[newIndex], () => {
-      canvas.renderAll();
-    });
+    loadCanvasFromJSON(canvas, history[newIndex]);
   };
 
   const handleSave = () => {
     if (!canvas) return;
-    
-    // Convert canvas to image
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 1,
-      multiplier: 1 // Add the required multiplier property
-    });
-    
-    // Create a temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = dataURL;
-    link.download = `journal-page-${new Date().toISOString().slice(0, 10)}.png`;
-    link.click();
+    saveCanvasAsImage(canvas);
   };
 
   return (
@@ -183,37 +147,5 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         <canvas ref={canvasRef} className="touch-none" />
       </div>
     </div>
-  );
-};
-
-interface ToolButtonProps {
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-}
-
-const ToolButton: React.FC<ToolButtonProps> = ({ 
-  active = false, 
-  disabled = false,
-  onClick, 
-  icon,
-  title 
-}) => {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "p-2 rounded-full focus-ring transition-colors",
-        active ? "bg-black text-white" : "text-gray-700 hover:bg-gray-100",
-        disabled && "opacity-50 cursor-not-allowed"
-      )}
-      title={title}
-    >
-      {icon}
-    </motion.button>
   );
 };
