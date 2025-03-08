@@ -84,7 +84,7 @@ const CalendarPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center text-gray-500 py-8 font-serif">
+                <div className="text-center py-8 font-serif">
                   {date ? 'No entries for this date' : 'Select a date to view entries'}
                 </div>
               )}
