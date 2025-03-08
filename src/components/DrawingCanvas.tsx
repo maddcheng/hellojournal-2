@@ -1,15 +1,26 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { Canvas, TEvent } from 'fabric';
-import { PenLine, Eraser, Undo, Redo, Save, Palette } from 'lucide-react';
+import { Canvas } from 'fabric';
+import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolButton } from './drawing/ToolButton';
 import { 
   initializeCanvas, 
   updateBrush, 
   saveCanvasAsImage, 
-  loadCanvasFromJSON 
+  loadCanvasFromJSON,
+  addText,
+  importImage,
+  enableLassoSelection,
+  rotateObject,
+  resizeObject,
+  TextOptions,
+  Tool
 } from '@/utils/canvasOperations';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -23,15 +34,37 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   className,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [canvas, setCanvas] = useState<Canvas | null>(null);
-  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
+  const [tool, setTool] = useState<Tool>('pen');
   const [brushSize, setBrushSize] = useState(2);
   const [penColor, setPenColor] = useState("#000000");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showTextOptions, setShowTextOptions] = useState(false);
+  
+  // Text options
+  const [textOptions, setTextOptions] = useState<TextOptions>({
+    fontFamily: 'Arial',
+    fontSize: 20,
+    fill: '#000000',
+    textAlign: 'left',
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    underline: false,
+  });
+
+  // Font options
+  const fontOptions = [
+    'Arial',
+    'Times New Roman',
+    'Courier New',
+    'Georgia',
+    'Verdana',
+    'Helvetica',
+  ];
 
   // Expose canvas instance through ref
   useImperativeHandle(ref, () => canvas, [canvas]);
@@ -116,70 +149,175 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     setTool('pen'); // Switch to pen when selecting a color
   };
 
+  const handleTextAdd = () => {
+    if (!canvas) return;
+    addText(canvas, 'Double click to edit', textOptions);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canvas || !e.target.files?.[0]) return;
+    importImage(canvas, e.target.files[0]);
+  };
+
+  const handleToolChange = (newTool: Tool) => {
+    setTool(newTool);
+    if (newTool === 'lasso' && canvas) {
+      enableLassoSelection(canvas);
+    }
+  };
+
+  const handleRotate = (clockwise: boolean) => {
+    if (!canvas) return;
+    rotateObject(canvas, clockwise ? 90 : -90);
+  };
+
+  const handleResize = (increase: boolean) => {
+    if (!canvas) return;
+    resizeObject(canvas, increase ? 0.1 : -0.1);
+  };
+
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      <div className="drawing-toolbar mb-4 flex items-center space-x-2 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
+      <div className="drawing-toolbar mb-4 flex items-center space-x-2 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm flex-wrap">
         <ToolButton 
           active={tool === 'pen'}
-          onClick={() => setTool('pen')}
+          onClick={() => handleToolChange('pen')}
           icon={<PenLine size={18} />}
           title="Pen"
         />
         <ToolButton 
           active={tool === 'eraser'}
-          onClick={() => setTool('eraser')}
+          onClick={() => handleToolChange('eraser')}
           icon={<Eraser size={18} />}
           title="Eraser"
         />
+        
         <div className="h-8 mx-1 border-r border-gray-200"></div>
         
-        {/* Color Picker */}
-        <Popover>
+        <Popover open={showTextOptions} onOpenChange={setShowTextOptions}>
           <PopoverTrigger asChild>
             <div>
               <ToolButton 
-                onClick={() => {}}
-                icon={<div className="w-4 h-4" />}
-                title="Current Color"
-                isColorButton={true}
-                color={penColor}
+                active={tool === 'text'}
+                onClick={() => handleToolChange('text')}
+                icon={<Type size={18} />}
+                title="Text"
               />
             </div>
           </PopoverTrigger>
-          <PopoverContent className="w-64 p-2" side="bottom">
-            <div className="mb-2">
-              <input 
-                type="color" 
-                value={penColor}
-                onChange={handleColorChange}
-                className="w-full h-8 cursor-pointer"
-              />
-            </div>
-            <div className="grid grid-cols-6 gap-1">
-              {colorOptions.map((color, index) => (
-                <button
-                  key={index}
-                  className="w-8 h-8 rounded-full border border-gray-200 cursor-pointer"
-                  style={{ backgroundColor: color }}
-                  onClick={() => handleSelectColor(color)}
-                  title={color}
+          <PopoverContent className="w-80 p-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Font Family</Label>
+                <Select
+                  value={textOptions.fontFamily}
+                  onValueChange={(value) => setTextOptions(prev => ({ ...prev, fontFamily: value }))}
+                >
+                  {fontOptions.map(font => (
+                    <option key={font} value={font}>{font}</option>
+                  ))}
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Font Size</Label>
+                <Input
+                  type="number"
+                  value={textOptions.fontSize}
+                  onChange={(e) => setTextOptions(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                  min={8}
+                  max={72}
                 />
-              ))}
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <Input
+                  type="color"
+                  value={textOptions.fill}
+                  onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
+                />
+              </div>
+              
+              <div className="flex space-x-2">
+                <Button
+                  variant={textOptions.fontWeight === 'bold' ? 'default' : 'outline'}
+                  onClick={() => setTextOptions(prev => ({ 
+                    ...prev, 
+                    fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' 
+                  }))}
+                >
+                  B
+                </Button>
+                <Button
+                  variant={textOptions.fontStyle === 'italic' ? 'default' : 'outline'}
+                  onClick={() => setTextOptions(prev => ({ 
+                    ...prev, 
+                    fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' 
+                  }))}
+                >
+                  I
+                </Button>
+                <Button
+                  variant={textOptions.underline ? 'default' : 'outline'}
+                  onClick={() => setTextOptions(prev => ({ 
+                    ...prev, 
+                    underline: !prev.underline 
+                  }))}
+                >
+                  U
+                </Button>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button onClick={handleTextAdd}>Add Text</Button>
+              </div>
             </div>
           </PopoverContent>
         </Popover>
         
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+        <ToolButton 
+          onClick={() => fileInputRef.current?.click()}
+          icon={<ImageIcon size={18} />}
+          title="Import Image"
+        />
+        
+        <ToolButton 
+          active={tool === 'lasso'}
+          onClick={() => handleToolChange('lasso')}
+          icon={<Lasso size={18} />}
+          title="Select"
+        />
+        
         <div className="h-8 mx-1 border-r border-gray-200"></div>
-        <select 
-          value={brushSize} 
-          onChange={(e) => setBrushSize(Number(e.target.value))}
-          className="bg-transparent border border-gray-200 rounded-md px-2 py-1 text-xs focus-ring"
-        >
-          <option value="1">Fine</option>
-          <option value="2">Medium</option>
-          <option value="4">Thick</option>
-          <option value="6">Very Thick</option>
-        </select>
+        <ToolButton 
+          onClick={() => handleRotate(false)}
+          icon={<RotateCcw size={18} />}
+          title="Rotate Left"
+        />
+        <ToolButton 
+          onClick={() => handleRotate(true)}
+          icon={<RotateCw size={18} />}
+          title="Rotate Right"
+        />
+        <ToolButton 
+          onClick={() => handleResize(true)}
+          icon={<ZoomIn size={18} />}
+          title="Scale Up"
+        />
+        <ToolButton 
+          onClick={() => handleResize(false)}
+          icon={<ZoomOut size={18} />}
+          title="Scale Down"
+        />
+        
         <div className="h-8 mx-1 border-r border-gray-200"></div>
         <ToolButton 
           onClick={handleUndo}
@@ -207,3 +345,5 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     </div>
   );
 });
+
+DrawingCanvas.displayName = 'DrawingCanvas';
