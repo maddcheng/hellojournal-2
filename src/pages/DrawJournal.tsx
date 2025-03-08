@@ -6,6 +6,7 @@ import { DrawingCanvas } from '@/components/DrawingCanvas';
 import { TemplateGenerator, TemplateType } from '@/components/TemplateGenerator';
 import { pageVariants } from '@/components/animations/PageTransition';
 import { formatDate } from '@/utils/dateUtils';
+import BackButton from '@/components/BackButton';
 
 const DrawJournal = () => {
   const [mode, setMode] = useState<'template' | 'draw'>('template');
@@ -27,9 +28,12 @@ const DrawJournal = () => {
         animate="animate"
         exit="exit"
       >
-        <div className="mb-6">
-          <h1 className="text-2xl font-serif">Journal Canvas</h1>
-          <p className="text-sm text-gray-600">{formatDate(new Date())}</p>
+        <div className="mb-6 flex items-center">
+          <BackButton className="mr-3" />
+          <div>
+            <h1 className="text-2xl font-serif">Journal Canvas</h1>
+            <p className="text-sm text-gray-600">{formatDate(new Date())}</p>
+          </div>
         </div>
         
         {mode === 'template' ? (
