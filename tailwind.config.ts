@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -18,6 +19,11 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['SF Pro Text', 'system-ui', 'sans-serif'],
+				serif: ['Palatino', 'Georgia', 'serif'],
+				mono: ['SF Mono', 'monospace'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -61,7 +67,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+				journal: {
+					paper: '#FFFCF8',
+					ink: '#222222',
+					accent: '#A0A0A0',
+					highlight: '#E9E5E0',
+				},
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +96,46 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'fade-in': {
+					'0%': { opacity: '0' },
+					'100%': { opacity: '1' }
+				},
+				'fade-out': {
+					'0%': { opacity: '1' },
+					'100%': { opacity: '0' }
+				},
+				'page-turn': {
+					'0%': { transform: 'rotateY(0deg)', opacity: '1' },
+					'50%': { transform: 'rotateY(10deg)', opacity: '0.5' },
+					'100%': { transform: 'rotateY(0deg)', opacity: '1' }
+				},
+				'float': {
+					'0%, 100%': { transform: 'translateY(0)' },
+					'50%': { transform: 'translateY(-5px)' }
+				},
+				'pulse-subtle': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.85' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.4s ease-in',
+				'fade-out': 'fade-out 0.4s ease-out',
+				'page-turn': 'page-turn 0.6s ease-in-out',
+				'float': 'float 3s ease-in-out infinite',
+				'pulse-subtle': 'pulse-subtle 4s ease-in-out infinite'
+			},
+			boxShadow: {
+				'paper': '0 1px 3px rgba(0,0,0,0.05), 0 3px 6px rgba(0,0,0,0.07)',
+				'paper-hover': '0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.12)',
+				'glass': '0 4px 12px rgba(0,0,0,0.05)',
+				'inner-paper': 'inset 0 1px 4px rgba(0,0,0,0.05)'
+			},
+			backdropBlur: {
+				'xs': '2px'
 			}
 		}
 	},
