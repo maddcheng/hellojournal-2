@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { Canvas } from 'fabric';
-import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut, Trash2 } from 'lucide-react';
+import { Canvas, IText } from 'fabric';
+import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut, Trash2, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolButton } from './drawing/ToolButton';
 import { 
@@ -15,24 +15,33 @@ import {
   resizeObject,
   deleteSelectedObjects,
   TextOptions,
-  Tool
+  Tool,
+  saveCanvasState,
+  loadDraft,
+  saveEntry,
+  clearDraft,
+  JournalEntry
 } from '@/utils/canvasOperations';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { useToast } from '@/components/ui/use-toast';
 
 interface DrawingCanvasProps {
   width?: number;
   height?: number;
   className?: string;
+  onSave?: (entry: JournalEntry) => void;
 }
 
 export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   width = 600,
   height = 800,
   className,
+  onSave
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +54,9 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
   const [showTextOptions, setShowTextOptions] = useState(false);
+  const { toast } = useToast();
+  const [title, setTitle] = useState('Untitled');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -55,6 +67,14 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     fontWeight: 'normal',
     fontStyle: 'normal',
     underline: false,
+    opacity: 1,
+    backgroundColor: 'transparent',
+    shadow: {
+      color: 'rgba(0,0,0,0.3)',
+      blur: 3,
+      offsetX: 2,
+      offsetY: 2
+    }
   });
 
   // Font options
@@ -83,7 +103,20 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     const fabricCanvas = initializeCanvas(canvasRef.current, width, height);
     setCanvas(fabricCanvas);
     
-    // Canvas event listeners for history management
+    // Try to load draft
+    const hasDraft = loadDraft(fabricCanvas);
+    if (hasDraft) {
+      toast({
+        title: "Draft Recovered",
+        description: "Your previous work has been restored.",
+      });
+    }
+    
+    // Canvas event listeners for history and auto-save
+    fabricCanvas.on('object:modified', () => {
+      saveCanvasState(fabricCanvas);
+    });
+
     fabricCanvas.on('object:added', () => {
       if (canvas) {
         const json = JSON.stringify(canvas.toJSON());
@@ -94,6 +127,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
           setCanRedo(false);
           return newHistory;
         });
+        saveCanvasState(canvas);
       }
     });
 
@@ -155,7 +189,18 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   const handleSave = () => {
     if (!canvas) return;
-    saveCanvasAsImage(canvas);
+    setShowSaveDialog(true);
+  };
+
+  const handleConfirmSave = () => {
+    if (!canvas) return;
+    const entry = saveEntry(canvas, title);
+    if (onSave) onSave(entry);
+    setShowSaveDialog(false);
+    toast({
+      title: "Entry Saved",
+      description: "Your journal entry has been saved successfully.",
+    });
   };
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,6 +250,18 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const handleResize = (increase: boolean) => {
     if (!canvas) return;
     resizeObject(canvas, increase ? 0.1 : -0.1);
+  };
+
+  const handleTextAlignment = (alignment: 'left' | 'center' | 'right') => {
+    setTextOptions(prev => ({ ...prev, textAlign: alignment }));
+    if (canvas) {
+      const activeObject = canvas.getActiveObject();
+      if (activeObject && activeObject.type === 'i-text') {
+        (activeObject as IText).set('textAlign', alignment);
+        canvas.renderAll();
+        saveCanvasState(canvas);
+      }
+    }
   };
 
   return (
@@ -300,6 +357,50 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
                 </Button>
               </div>
               
+              <div className="space-y-2">
+                <Label>Text Alignment</Label>
+                <div className="flex space-x-2">
+                  <Button
+                    variant={textOptions.textAlign === 'left' ? 'default' : 'outline'}
+                    onClick={() => handleTextAlignment('left')}
+                  >
+                    <AlignLeft size={16} />
+                  </Button>
+                  <Button
+                    variant={textOptions.textAlign === 'center' ? 'default' : 'outline'}
+                    onClick={() => handleTextAlignment('center')}
+                  >
+                    <AlignCenter size={16} />
+                  </Button>
+                  <Button
+                    variant={textOptions.textAlign === 'right' ? 'default' : 'outline'}
+                    onClick={() => handleTextAlignment('right')}
+                  >
+                    <AlignRight size={16} />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Opacity</Label>
+                <Slider
+                  value={[textOptions.opacity || 1]}
+                  onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Background Color</Label>
+                <Input
+                  type="color"
+                  value={textOptions.backgroundColor || 'transparent'}
+                  onChange={(e) => setTextOptions(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                />
+              </div>
+              
               <div className="flex justify-end">
                 <Button onClick={handleTextAdd}>Add Text</Button>
               </div>
@@ -374,6 +475,30 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
           title="Save as Image"
         />
       </div>
+      
+      {/* Save Dialog */}
+      <Popover open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <PopoverContent className="w-80 p-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Entry Title</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter a title for your entry"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmSave}>
+                Save Entry
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
       
       <div className="canvas-container shadow-paper overflow-hidden rounded-lg">
         <canvas ref={canvasRef} className="touch-none" />

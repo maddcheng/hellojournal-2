@@ -1,4 +1,18 @@
-import { Canvas, PencilBrush, Image as FabricImage, IText, Object as FabricObject } from 'fabric';
+import { Canvas, PencilBrush, Image as FabricImage, IText, Object as FabricObject, Shadow } from 'fabric';
+
+// Local storage keys
+const DRAFT_KEY = 'journal_draft';
+const ENTRIES_KEY = 'journal_entries';
+
+export interface JournalEntry {
+  id: string;
+  title: string;
+  content: string; // Canvas JSON
+  type: 'drawing' | 'text';
+  createdAt: string;
+  updatedAt: string;
+  isDraft: boolean;
+}
 
 export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, height: number): Canvas => {
   const fabricCanvas = new Canvas(canvasRef, {
@@ -80,6 +94,14 @@ export interface TextOptions {
   fontWeight: 'normal' | 'bold';
   fontStyle: 'normal' | 'italic';
   underline: boolean;
+  backgroundColor?: string;
+  opacity?: number;
+  shadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+  };
 }
 
 export const addText = (canvas: Canvas, text: string, options: TextOptions): IText => {
@@ -89,11 +111,18 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
     ...options,
     originX: 'center',
     originY: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: options.backgroundColor || 'rgba(255, 255, 255, 0.8)',
     editingBorderColor: '#0EA5E9',
     selectionColor: 'rgba(14, 165, 233, 0.2)',
     selectionBackgroundColor: 'rgba(255, 255, 255, 0.8)',
     padding: 8,
+    opacity: options.opacity || 1,
+    shadow: options.shadow ? new Shadow({
+      color: options.shadow.color,
+      blur: options.shadow.blur,
+      offsetX: options.shadow.offsetX,
+      offsetY: options.shadow.offsetY,
+    }) : null,
   });
 
   canvas.add(textObj);
@@ -108,8 +137,9 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
   });
 
   textObj.on('editing:exited', () => {
-    textObj.set('backgroundColor', 'transparent');
+    textObj.set('backgroundColor', options.backgroundColor || 'transparent');
     canvas.renderAll();
+    saveCanvasState(canvas); // Auto-save when text editing is done
   });
 
   return textObj;
@@ -147,6 +177,7 @@ export const importImage = (canvas: Canvas, file: File): Promise<FabricImage> =>
         canvas.add(fabricImage);
         canvas.setActiveObject(fabricImage);
         canvas.renderAll();
+        saveCanvasState(canvas); // Auto-save when image is added
         resolve(fabricImage);
       };
     };
@@ -186,4 +217,56 @@ export const resizeObject = (canvas: Canvas, scaleChange: number): void => {
     activeObject.scale(newScale);
     canvas.renderAll();
   }
+};
+
+export const saveCanvasState = (canvas: Canvas): void => {
+  if (!canvas) return;
+  const json = JSON.stringify(canvas.toJSON());
+  localStorage.setItem(DRAFT_KEY, json);
+};
+
+export const loadDraft = (canvas: Canvas): boolean => {
+  const draft = localStorage.getItem(DRAFT_KEY);
+  if (draft) {
+    loadCanvasFromJSON(canvas, draft);
+    return true;
+  }
+  return false;
+};
+
+export const saveEntry = (canvas: Canvas, title: string = 'Untitled'): JournalEntry => {
+  const json = JSON.stringify(canvas.toJSON());
+  const entry: JournalEntry = {
+    id: Date.now().toString(),
+    title,
+    content: json,
+    type: 'drawing',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    isDraft: false,
+  };
+
+  const entries = getEntries();
+  entries.push(entry);
+  localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+  localStorage.removeItem(DRAFT_KEY); // Clear draft after saving
+  return entry;
+};
+
+export const getEntries = (): JournalEntry[] => {
+  const entriesJson = localStorage.getItem(ENTRIES_KEY);
+  return entriesJson ? JSON.parse(entriesJson) : [];
+};
+
+export const getDraft = (): string | null => {
+  return localStorage.getItem(DRAFT_KEY);
+};
+
+export const clearDraft = (): void => {
+  localStorage.removeItem(DRAFT_KEY);
+};
+
+export const deleteEntry = (id: string): void => {
+  const entries = getEntries().filter(entry => entry.id !== id);
+  localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
 };
