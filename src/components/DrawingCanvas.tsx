@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
+import HSBColorPicker from './drawing/HSBColorPicker';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -57,6 +58,8 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const { toast } = useToast();
   const [title, setTitle] = useState('Untitled');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -281,6 +284,41 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         />
         
         <div className="h-8 mx-1 border-r border-gray-200"></div>
+        
+        <Popover open={showColorPicker} onOpenChange={setShowColorPicker}>
+          <PopoverTrigger asChild>
+            <div>
+              <ToolButton 
+                onClick={() => {}}
+                icon={<div className="w-4 h-4 rounded-full" style={{ backgroundColor: penColor }} />}
+                title="Color"
+              />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4">
+            <div className="space-y-4">
+              <HSBColorPicker value={penColor} onChange={setPenColor} />
+              
+              <div className="space-y-2">
+                <Label>Stroke Width</Label>
+                <div className="flex items-center space-x-2">
+                  <Slider
+                    value={[strokeWidth]}
+                    onValueChange={([value]) => {
+                      setStrokeWidth(value);
+                      setBrushSize(value);
+                    }}
+                    min={1}
+                    max={50}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-sm text-right">{strokeWidth}px</span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         
         <Popover open={showTextOptions} onOpenChange={setShowTextOptions}>
           <PopoverTrigger asChild>
