@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -69,7 +68,7 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				journal: {
-					paper: '#FFFCF8',
+					paper: '#F0F8FF',
 					ink: '#222222',
 					accent: '#A0A0A0',
 					highlight: '#E9E5E0',
