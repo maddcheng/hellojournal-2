@@ -89,11 +89,39 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
     ...options,
     originX: 'center',
     originY: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    editingBorderColor: '#0EA5E9',
+    selectionColor: 'rgba(14, 165, 233, 0.2)',
+    selectionBackgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 8,
   });
+
   canvas.add(textObj);
   canvas.setActiveObject(textObj);
+  textObj.enterEditing();
   canvas.renderAll();
+
+  // Add event listeners for editing state
+  textObj.on('editing:entered', () => {
+    textObj.set('backgroundColor', 'rgba(255, 255, 255, 0.8)');
+    canvas.renderAll();
+  });
+
+  textObj.on('editing:exited', () => {
+    textObj.set('backgroundColor', 'transparent');
+    canvas.renderAll();
+  });
+
   return textObj;
+};
+
+export const deleteSelectedObjects = (canvas: Canvas): void => {
+  const activeObjects = canvas.getActiveObjects();
+  if (activeObjects.length > 0) {
+    canvas.discardActiveObject(); // Clear selection first
+    activeObjects.forEach(obj => canvas.remove(obj));
+    canvas.renderAll();
+  }
 };
 
 export const importImage = (canvas: Canvas, file: File): Promise<FabricImage> => {
@@ -130,9 +158,16 @@ export const importImage = (canvas: Canvas, file: File): Promise<FabricImage> =>
 export const enableLassoSelection = (canvas: Canvas): void => {
   canvas.isDrawingMode = false;
   canvas.selection = true;
-  canvas.selectionColor = 'rgba(100, 100, 255, 0.3)';
-  canvas.selectionBorderColor = 'rgba(100, 100, 255, 0.8)';
+  canvas.selectionColor = 'rgba(14, 165, 233, 0.2)';
+  canvas.selectionBorderColor = '#0EA5E9';
   canvas.selectionLineWidth = 1;
+  
+  // Ensure proper stacking order
+  canvas.preserveObjectStacking = true;
+  
+  // Center scaling point
+  canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+  canvas.centeredScaling = true;
 };
 
 export const rotateObject = (canvas: Canvas, angle: number): void => {

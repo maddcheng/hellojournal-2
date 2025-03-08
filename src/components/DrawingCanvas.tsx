@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Canvas } from 'fabric';
-import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolButton } from './drawing/ToolButton';
 import { 
@@ -13,6 +13,7 @@ import {
   enableLassoSelection,
   rotateObject,
   resizeObject,
+  deleteSelectedObjects,
   TextOptions,
   Tool
 } from '@/utils/canvasOperations';
@@ -95,6 +96,23 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         });
       }
     });
+
+    // Handle text editing state
+    fabricCanvas.on('text:editing:entered', (e) => {
+      const textObj = e.target;
+      if (textObj) {
+        textObj.set('backgroundColor', 'rgba(255, 255, 255, 0.8)');
+        fabricCanvas.renderAll();
+      }
+    });
+
+    fabricCanvas.on('text:editing:exited', (e) => {
+      const textObj = e.target;
+      if (textObj) {
+        textObj.set('backgroundColor', 'transparent');
+        fabricCanvas.renderAll();
+      }
+    });
     
     return () => {
       fabricCanvas.dispose();
@@ -149,9 +167,15 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     setTool('pen'); // Switch to pen when selecting a color
   };
 
+  const handleDelete = () => {
+    if (!canvas) return;
+    deleteSelectedObjects(canvas);
+  };
+
   const handleTextAdd = () => {
     if (!canvas) return;
-    addText(canvas, 'Double click to edit', textOptions);
+    const textObj = addText(canvas, 'Double click to edit', textOptions);
+    setTool('text');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,8 +185,15 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   const handleToolChange = (newTool: Tool) => {
     setTool(newTool);
-    if (newTool === 'lasso' && canvas) {
+    if (!canvas) return;
+
+    if (newTool === 'lasso') {
       enableLassoSelection(canvas);
+    } else if (newTool === 'text') {
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
+    } else {
+      updateBrush(canvas, newTool, brushSize, penColor);
     }
   };
 
@@ -319,6 +350,11 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         />
         
         <div className="h-8 mx-1 border-r border-gray-200"></div>
+        <ToolButton 
+          onClick={handleDelete}
+          icon={<Trash2 size={18} />}
+          title="Delete Selected"
+        />
         <ToolButton 
           onClick={handleUndo}
           disabled={!canUndo}
