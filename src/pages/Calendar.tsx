@@ -66,7 +66,7 @@ const CalendarPage = () => {
           {/* Entries for selected date */}
           <Card className="p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-medium">
+              <h2 className="text-lg font-serif">
                 Entries for {date ? formatDate(date) : 'Selected Date'}
               </h2>
             </div>
@@ -76,7 +76,7 @@ const CalendarPage = () => {
                 <div className="space-y-4">
                   {selectedDateEntries.map(entry => (
                     <Card key={entry.id} className="p-4 hover:shadow-md transition-shadow">
-                      <h3 className="font-medium mb-2">{entry.title}</h3>
+                      <h3 className="font-serif mb-2">{entry.title}</h3>
                       <p className="text-sm text-gray-600 line-clamp-3">
                         {entry.content}
                       </p>
@@ -84,7 +84,7 @@ const CalendarPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center text-gray-500 py-8">
+                <div className="text-center text-gray-500 py-8 font-serif">
                   {date ? 'No entries for this date' : 'Select a date to view entries'}
                 </div>
               )}
