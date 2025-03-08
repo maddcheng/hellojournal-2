@@ -1,7 +1,7 @@
 import React, { ReactNode, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, Menu, Book, Calendar, Settings } from 'lucide-react';
+import { ChevronLeft, Menu, Book, Calendar, Settings, Home, PenLine } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Link, useLocation } from 'react-router-dom';
 
