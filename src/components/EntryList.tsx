@@ -1,36 +1,15 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { formatDate, formatTime, getRelativeTime, createDateWithRandomOffset } from '@/utils/dateUtils';
+import { formatDate, formatTime, getRelativeTime } from '@/utils/dateUtils';
 import { cn } from '@/lib/utils';
 
-// Sample journal entry data
-const sampleEntries = [
-  {
-    id: 1,
-    title: "Morning reflections",
-    content: "Woke up early today and spent some time meditating before the day started. I'm finding that these quiet morning moments really set a positive tone for the day.",
-    date: createDateWithRandomOffset(1),
-  },
-  {
-    id: 2,
-    title: "Creative breakthrough",
-    content: "Finally solved that design problem I've been stuck on for days! Sometimes stepping away and letting your mind wander is exactly what you need.",
-    date: createDateWithRandomOffset(3),
-  },
-  {
-    id: 3,
-    title: "Uncertainty and growth",
-    content: "Feeling uncertain about the new project, but I'm trying to embrace the discomfort. Growth happens at the edges of our comfort zones.",
-    date: createDateWithRandomOffset(5),
-  },
-  {
-    id: 4, 
-    title: "Weekend plans",
-    content: "Looking forward to hiking this weekend. Nature always helps me reset and gain perspective on what truly matters.",
-    date: createDateWithRandomOffset(7),
-  }
-];
+interface Entry {
+  id: number;
+  title: string;
+  content: string;
+  date: Date;
+  prompt?: string;
+}
 
 interface EntryListProps {
   onSelectEntry?: (entryId: number) => void;
@@ -38,40 +17,48 @@ interface EntryListProps {
 }
 
 export const EntryList: React.FC<EntryListProps> = ({ onSelectEntry, className }) => {
-  return (
-    <motion.div 
-      className={cn("space-y-4", className)}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.2, duration: 0.5 }}
-    >
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-serif">Recent Entries</h2>
-      </div>
+  const [entries, setEntries] = useState<Entry[]>([]);
 
-      <div className="space-y-3">
-        {sampleEntries.map((entry, index) => (
-          <EntryCard 
-            key={entry.id} 
-            entry={entry} 
+  useEffect(() => {
+    // Load entries from localStorage
+    const savedEntries = JSON.parse(localStorage.getItem('journal-entries') || '[]');
+    // Convert string dates back to Date objects
+    const entriesWithDates = savedEntries.map((entry: any) => ({
+      ...entry,
+      date: new Date(entry.date)
+    }));
+    setEntries(entriesWithDates);
+  }, []);
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      {entries.length > 0 ? (
+        entries.map((entry, index) => (
+          <EntryCard
+            key={entry.id}
+            entry={entry}
             index={index}
-            onClick={() => onSelectEntry?.(entry.id)} 
+            onClick={() => onSelectEntry?.(entry.id)}
           />
-        ))}
-      </div>
-    </motion.div>
+        ))
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-12 text-gray-500"
+        >
+          <p className="font-serif text-lg mb-2">No entries yet</p>
+          <p className="text-sm">Start writing your first journal entry!</p>
+        </motion.div>
+      )}
+    </div>
   );
 };
 
 interface EntryCardProps {
-  entry: {
-    id: number;
-    title: string;
-    content: string;
-    date: Date;
-  };
+  entry: Entry;
   index: number;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 const EntryCard: React.FC<EntryCardProps> = ({ entry, index, onClick }) => {

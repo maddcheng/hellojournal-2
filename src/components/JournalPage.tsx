@@ -1,10 +1,11 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { formatDate, formatTime } from '@/utils/dateUtils';
 import { pageVariants } from './animations/PageTransition';
 import { JournalPrompt } from './JournalPrompt';
 import { PenLine } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 
 interface JournalPageProps {
   className?: string;
@@ -15,6 +16,8 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
   const [title, setTitle] = useState('');
   const [savedPrompt, setSavedPrompt] = useState('');
   const currentDate = new Date();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleSelectPrompt = (prompt: string) => {
     setSavedPrompt(prompt);
@@ -23,6 +26,78 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
     if (textarea) {
       textarea.focus();
     }
+  };
+
+  const handleSaveDraft = () => {
+    if (!title.trim() && !content.trim()) {
+      toast({
+        title: "Cannot save empty entry",
+        description: "Please add a title or content before saving",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const draft = {
+      id: Date.now(),
+      title: title.trim() || 'Untitled Entry',
+      content: content.trim(),
+      prompt: savedPrompt,
+      lastModified: new Date(),
+    };
+
+    // Get existing drafts from localStorage
+    const existingDrafts = JSON.parse(localStorage.getItem('journal-drafts') || '[]');
+    
+    // Add new draft
+    const updatedDrafts = [draft, ...existingDrafts];
+    
+    // Save to localStorage
+    localStorage.setItem('journal-drafts', JSON.stringify(updatedDrafts));
+
+    toast({
+      title: "Draft saved successfully",
+      description: "You can find it in the Drafts page",
+    });
+
+    // Navigate to drafts page
+    navigate('/drafts');
+  };
+
+  const handlePublishEntry = () => {
+    if (!title.trim() && !content.trim()) {
+      toast({
+        title: "Cannot publish empty entry",
+        description: "Please add a title or content before publishing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const entry = {
+      id: Date.now(),
+      title: title.trim() || 'Untitled Entry',
+      content: content.trim(),
+      prompt: savedPrompt,
+      date: new Date(),
+    };
+
+    // Get existing entries from localStorage
+    const existingEntries = JSON.parse(localStorage.getItem('journal-entries') || '[]');
+    
+    // Add new entry
+    const updatedEntries = [entry, ...existingEntries];
+    
+    // Save to localStorage
+    localStorage.setItem('journal-entries', JSON.stringify(updatedEntries));
+
+    toast({
+      title: "Entry published successfully",
+      description: "You can find it in your entries list",
+    });
+
+    // Navigate to home page
+    navigate('/');
   };
 
   return (
@@ -86,6 +161,7 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={handleSaveDraft}
           className="px-5 py-2.5 bg-white border border-gray-200 rounded-full text-sm font-medium shadow-sm hover:shadow focus-ring"
         >
           Save Draft
@@ -94,6 +170,7 @@ export const JournalPage: React.FC<JournalPageProps> = ({ className }) => {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={handlePublishEntry}
           className="px-5 py-2.5 bg-black text-white rounded-full text-sm font-medium shadow-sm hover:bg-gray-800 focus-ring"
         >
           Publish Entry
