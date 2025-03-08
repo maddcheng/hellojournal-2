@@ -21,13 +21,14 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
 export const updateBrush = (
   canvas: Canvas, 
   tool: 'pen' | 'eraser', 
-  brushSize: number
+  brushSize: number,
+  penColor: string = "#000000"
 ): void => {
   if (!canvas) return;
   
   if (tool === 'pen') {
     const pencilBrush = new PencilBrush(canvas);
-    pencilBrush.color = "#000000";
+    pencilBrush.color = penColor;
     pencilBrush.width = brushSize;
     canvas.freeDrawingBrush = pencilBrush;
   } else if (tool === 'eraser') {

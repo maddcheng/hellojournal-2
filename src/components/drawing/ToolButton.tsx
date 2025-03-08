@@ -9,6 +9,8 @@ interface ToolButtonProps {
   onClick: () => void;
   icon: React.ReactNode;
   title: string;
+  color?: string;
+  isColorButton?: boolean;
 }
 
 export const ToolButton: React.FC<ToolButtonProps> = ({ 
@@ -16,7 +18,9 @@ export const ToolButton: React.FC<ToolButtonProps> = ({
   disabled = false,
   onClick, 
   icon,
-  title 
+  title,
+  color,
+  isColorButton = false
 }) => {
   return (
     <motion.button
@@ -29,6 +33,7 @@ export const ToolButton: React.FC<ToolButtonProps> = ({
         disabled && "opacity-50 cursor-not-allowed"
       )}
       title={title}
+      style={isColorButton ? { backgroundColor: color } : undefined}
     >
       {icon}
     </motion.button>

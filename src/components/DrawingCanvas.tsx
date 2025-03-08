@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas, TEvent } from 'fabric';
-import { PenLine, Eraser, Undo, Redo, Save } from 'lucide-react';
+import { PenLine, Eraser, Undo, Redo, Save, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolButton } from './drawing/ToolButton';
 import { 
@@ -10,6 +10,7 @@ import {
   saveCanvasAsImage, 
   loadCanvasFromJSON 
 } from '@/utils/canvasOperations';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -26,10 +27,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
   const [brushSize, setBrushSize] = useState(2);
+  const [penColor, setPenColor] = useState("#000000");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Predefined colors
+  const colorOptions = [
+    "#000000", "#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF3333", 
+    "#33FFF3", "#F3FF33", "#FF33F3", "#8B5CF6", "#F97316", "#0EA5E9"
+  ];
 
   // Initialize the canvas
   useEffect(() => {
@@ -57,11 +66,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     };
   }, []);
 
-  // Update brush when tool/size changes
+  // Update brush when tool/size/color changes
   useEffect(() => {
     if (!canvas) return;
-    updateBrush(canvas, tool, brushSize);
-  }, [tool, brushSize, canvas]);
+    updateBrush(canvas, tool, brushSize, penColor);
+  }, [tool, brushSize, penColor, canvas]);
 
   const handleUndo = () => {
     if (!canvas || historyIndex <= 0) return;
@@ -96,6 +105,15 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     saveCanvasAsImage(canvas);
   };
 
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPenColor(e.target.value);
+  };
+
+  const handleSelectColor = (color: string) => {
+    setPenColor(color);
+    setTool('pen'); // Switch to pen when selecting a color
+  };
+
   return (
     <div className={cn("flex flex-col items-center", className)}>
       <div className="drawing-toolbar mb-4 flex items-center space-x-2 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
@@ -111,6 +129,44 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           icon={<Eraser size={18} />}
           title="Eraser"
         />
+        <div className="h-8 mx-1 border-r border-gray-200"></div>
+        
+        {/* Color Picker */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <div>
+              <ToolButton 
+                onClick={() => {}}
+                icon={<div className="w-4 h-4" />}
+                title="Current Color"
+                isColorButton={true}
+                color={penColor}
+              />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-2" side="bottom">
+            <div className="mb-2">
+              <input 
+                type="color" 
+                value={penColor}
+                onChange={handleColorChange}
+                className="w-full h-8 cursor-pointer"
+              />
+            </div>
+            <div className="grid grid-cols-6 gap-1">
+              {colorOptions.map((color, index) => (
+                <button
+                  key={index}
+                  className="w-8 h-8 rounded-full border border-gray-200 cursor-pointer"
+                  style={{ backgroundColor: color }}
+                  onClick={() => handleSelectColor(color)}
+                  title={color}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        
         <div className="h-8 mx-1 border-r border-gray-200"></div>
         <select 
           value={brushSize} 
