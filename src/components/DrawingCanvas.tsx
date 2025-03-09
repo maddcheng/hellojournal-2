@@ -79,6 +79,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const lastPointer = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasDraftLoaded, setHasDraftLoaded] = useState(false);
+  const [canvasInitialized, setCanvasInitialized] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -110,10 +111,11 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   // Initialize the canvas with selected size
   useEffect(() => {
-    if (!canvasRef.current || showCanvasSizeSelector) return;
+    if (!canvasRef.current || showCanvasSizeSelector || canvasInitialized) return;
 
     const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
+    setCanvasInitialized(true);
     
     // Try to load draft only once when canvas is first created
     if (!hasDraftLoaded) {
@@ -177,7 +179,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Set up zoom and pan handlers
     fabricCanvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
-      let newZoom = zoom;
+      let newZoom = fabricCanvas.getZoom();
       
       if (delta > 0) {
         newZoom *= 0.95;
@@ -228,7 +230,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     return () => {
       fabricCanvas.dispose();
     };
-  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning, hasDraftLoaded]);
+  }, [showCanvasSizeSelector, canvasSize, canvasInitialized]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {
@@ -353,7 +355,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const handleZoom = (zoomIn: boolean) => {
     if (!canvas) return;
     
-    let newZoom = zoom;
+    let newZoom = canvas.getZoom();
     if (zoomIn) {
       newZoom *= 1.1;
     } else {
@@ -758,21 +760,24 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       
       <div 
         ref={containerRef}
-        className="canvas-container shadow-paper overflow-auto rounded-lg bg-gray-200 p-8"
+        className="canvas-container shadow-paper overflow-auto rounded-lg bg-gray-200"
         style={{
-          maxWidth: '100%',
-          maxHeight: 'calc(100vh - 200px)',
-          position: 'relative'
+          width: '100%',
+          maxWidth: '100vw',
+          height: 'calc(100vh - 200px)',
+          padding: '2rem',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
         }}
       >
         <div 
           style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: '0 0',
+            position: 'relative',
             width: canvasSize.width,
             height: canvasSize.height,
             backgroundColor: '#ffffff',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
           <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
