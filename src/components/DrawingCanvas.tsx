@@ -31,6 +31,7 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import HSBColorPicker from './drawing/HSBColorPicker';
 import CanvasSizeSelector from './drawing/CanvasSizeSelector';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface DrawingCanvasProps {
   width?: number;
@@ -39,14 +40,14 @@ interface DrawingCanvasProps {
   onSave?: (entry: JournalEntry) => void;
 }
 
-// Add font options as a constant
+// Update font options
 const FONT_OPTIONS = [
-  { name: 'Sans Serif', value: 'Arial' },
-  { name: 'Serif', value: 'Times New Roman' },
-  { name: 'Monospace', value: 'Courier New' },
-  { name: 'Elegant', value: 'Georgia' },
-  { name: 'Clean', value: 'Verdana' },
-  { name: 'Modern', value: 'Helvetica' },
+  { name: 'Sans', value: 'Arial', sample: 'Aa' },
+  { name: 'Serif', value: 'Times New Roman', sample: 'Aa' },
+  { name: 'Mono', value: 'Courier New', sample: 'Aa' },
+  { name: 'Elegant', value: 'Georgia', sample: 'Aa' },
+  { name: 'Clean', value: 'Verdana', sample: 'Aa' },
+  { name: 'Modern', value: 'Helvetica', sample: 'Aa' },
 ] as const;
 
 export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
@@ -422,7 +423,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   }
 
   return (
-    <div className={cn("flex flex-col items-center", className)}>
+    <div className={cn("flex flex-col items-center min-h-screen bg-gray-100", className)}>
       <div className="drawing-toolbar mb-4 flex items-center gap-2 p-4 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm flex-wrap justify-center">
         {/* Drawing Tools Group */}
         <div className="flex items-center gap-2">
@@ -509,117 +510,119 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
                 />
               </div>
             </PopoverTrigger>
-            <PopoverContent className="text-options-popover w-80 p-4">
+            <PopoverContent className="w-80 p-4" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Typography</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <Label>Font Style</Label>
+                  <ToggleGroup 
+                    type="single" 
+                    value={textOptions.fontFamily}
+                    onValueChange={(value) => {
+                      if (value) setTextOptions(prev => ({ ...prev, fontFamily: value }));
+                    }}
+                    className="grid grid-cols-2 gap-2"
+                  >
                     {FONT_OPTIONS.map(font => (
-                      <Button
+                      <ToggleGroupItem
                         key={font.value}
-                        variant={textOptions.fontFamily === font.value ? 'default' : 'outline'}
-                        onClick={() => setTextOptions(prev => ({ ...prev, fontFamily: font.value }))}
-                        className="w-full justify-start"
-                        style={{ fontFamily: font.value }}
+                        value={font.value}
+                        aria-label={font.name}
+                        className="flex flex-col items-center p-2 gap-1"
                       >
-                        {font.name}
-                      </Button>
+                        <span className="text-sm font-normal">{font.name}</span>
+                        <span style={{ fontFamily: font.value }} className="text-lg">
+                          {font.sample}
+                        </span>
+                      </ToggleGroupItem>
                     ))}
-                  </div>
+                  </ToggleGroup>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Font Size</Label>
-                  <Input
-                    type="number"
-                    value={textOptions.fontSize}
-                    onChange={(e) => setTextOptions(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                    min={8}
-                    max={72}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Color</Label>
-                  <Input
-                    type="color"
-                    value={textOptions.fill}
-                    onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
-                  />
-                </div>
-                
-                <div className="flex space-x-2">
-                  <Button
-                    variant={textOptions.fontWeight === 'bold' ? 'default' : 'outline'}
-                    onClick={() => setTextOptions(prev => ({ 
-                      ...prev, 
-                      fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' 
-                    }))}
-                  >
-                    B
-                  </Button>
-                  <Button
-                    variant={textOptions.fontStyle === 'italic' ? 'default' : 'outline'}
-                    onClick={() => setTextOptions(prev => ({ 
-                      ...prev, 
-                      fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' 
-                    }))}
-                  >
-                    I
-                  </Button>
-                  <Button
-                    variant={textOptions.underline ? 'default' : 'outline'}
-                    onClick={() => setTextOptions(prev => ({ 
-                      ...prev, 
-                      underline: !prev.underline 
-                    }))}
-                  >
-                    U
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Text Alignment</Label>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant={textOptions.textAlign === 'left' ? 'default' : 'outline'}
-                      onClick={() => handleTextAlignment('left')}
-                    >
-                      <AlignLeft size={16} />
-                    </Button>
-                    <Button
-                      variant={textOptions.textAlign === 'center' ? 'default' : 'outline'}
-                      onClick={() => handleTextAlignment('center')}
-                    >
-                      <AlignCenter size={16} />
-                    </Button>
-                    <Button
-                      variant={textOptions.textAlign === 'right' ? 'default' : 'outline'}
-                      onClick={() => handleTextAlignment('right')}
-                    >
-                      <AlignRight size={16} />
-                    </Button>
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[textOptions.fontSize]}
+                      onValueChange={([value]) => setTextOptions(prev => ({ ...prev, fontSize: value }))}
+                      min={8}
+                      max={72}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-sm text-right">{textOptions.fontSize}px</span>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Opacity</Label>
-                  <Slider
-                    value={[textOptions.opacity || 1]}
-                    onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                  />
+                  <Label>Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      value={textOptions.fill}
+                      onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
+                      className="w-12 h-8 p-0 border-0"
+                    />
+                    <Input
+                      type="text"
+                      value={textOptions.fill}
+                      onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
+                      className="flex-1"
+                      placeholder="#000000"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-between gap-2">
+                  <ToggleGroup type="multiple" className="flex justify-start gap-1" value={[
+                    textOptions.fontWeight === 'bold' ? 'bold' : '',
+                    textOptions.fontStyle === 'italic' ? 'italic' : '',
+                    textOptions.underline ? 'underline' : '',
+                  ].filter(Boolean)}
+                  onValueChange={(values) => {
+                    setTextOptions(prev => ({
+                      ...prev,
+                      fontWeight: values.includes('bold') ? 'bold' : 'normal',
+                      fontStyle: values.includes('italic') ? 'italic' : 'normal',
+                      underline: values.includes('underline'),
+                    }));
+                  }}>
+                    <ToggleGroupItem value="bold" aria-label="Bold">
+                      B
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="italic" aria-label="Italic">
+                      I
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="underline" aria-label="Underline">
+                      U
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+
+                  <ToggleGroup type="single" value={textOptions.textAlign} onValueChange={(value: any) => handleTextAlignment(value)}>
+                    <ToggleGroupItem value="left" aria-label="Align left">
+                      <AlignLeft size={16} />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="center" aria-label="Align center">
+                      <AlignCenter size={16} />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="right" aria-label="Align right">
+                      <AlignRight size={16} />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Background Color</Label>
-                  <Input
-                    type="color"
-                    value={textOptions.backgroundColor || 'transparent'}
-                    onChange={(e) => setTextOptions(prev => ({ ...prev, backgroundColor: e.target.value }))}
-                  />
+                  <Label>Opacity</Label>
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[textOptions.opacity || 1]}
+                      onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-sm text-right">{Math.round((textOptions.opacity || 1) * 100)}%</span>
+                  </div>
                 </div>
                 
                 <div className="sticky bottom-0 pt-2 bg-white border-t">
@@ -755,14 +758,25 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       
       <div 
         ref={containerRef}
-        className="canvas-container shadow-paper overflow-hidden rounded-lg"
+        className="canvas-container shadow-paper overflow-auto rounded-lg bg-gray-200 p-8"
         style={{
           maxWidth: '100%',
           maxHeight: 'calc(100vh - 200px)',
-          overflow: 'hidden'
+          position: 'relative'
         }}
       >
-        <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
+        <div 
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: '0 0',
+            width: canvasSize.width,
+            height: canvasSize.height,
+            backgroundColor: '#ffffff',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}
+        >
+          <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
+        </div>
       </div>
     </div>
   );
