@@ -125,54 +125,59 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         setHasDraftLoaded(true);
       }
     }
-    
-    // Make all IText objects editable by default
-    fabricCanvas.on('object:added', (e) => {
-      const obj = e.target;
-      if (obj instanceof IText) {
-        obj.set({
-          selectable: true
-        });
-        fabricCanvas.setActiveObject(obj);
-      }
-    });
 
-    // Canvas event listeners for history and auto-save
-    fabricCanvas.on('object:modified', () => {
+    // Auto-save on any canvas change
+    const saveState = () => {
       saveCanvasState(fabricCanvas);
-    });
+    };
 
-    fabricCanvas.on('object:added', () => {
-      if (canvas) {
-        const json = JSON.stringify(canvas.toJSON());
-        setHistory(prev => {
-          const newHistory = [...prev.slice(0, historyIndex + 1), json];
-          setHistoryIndex(historyIndex + 1);
-          setCanUndo(true);
-          setCanRedo(false);
-          return newHistory;
-        });
-        saveCanvasState(canvas);
+    // Add event listeners for all possible changes
+    fabricCanvas.on({
+      'object:modified': saveState,
+      'object:added': saveState,
+      'object:removed': saveState,
+      'path:created': saveState,
+      'selection:updated': saveState,
+      'selection:created': (e) => {
+        const selectedObject = fabricCanvas.getActiveObject();
+        if (selectedObject && selectedObject.type === 'i-text') {
+          setShowTextOptions(true);
+          setTextOptions({
+            ...textOptions,
+            fontFamily: selectedObject.get('fontFamily') || textOptions.fontFamily,
+            fontSize: selectedObject.get('fontSize') || textOptions.fontSize,
+            fill: selectedObject.get('fill') || textOptions.fill,
+            textAlign: (selectedObject.get('textAlign') as 'left' | 'center' | 'right') || textOptions.textAlign,
+            fontWeight: selectedObject.get('fontWeight') || textOptions.fontWeight,
+            fontStyle: selectedObject.get('fontStyle') || textOptions.fontStyle,
+            underline: selectedObject.get('underline') || textOptions.underline,
+            opacity: selectedObject.get('opacity') || textOptions.opacity,
+            backgroundColor: selectedObject.get('backgroundColor') || textOptions.backgroundColor,
+          });
+        }
+      },
+      'selection:cleared': () => {
+        setShowTextOptions(false);
+      },
+      'text:changed': saveState,
+      'text:selection:changed': saveState,
+      'text:editing:entered': (e) => {
+        const textObj = e.target;
+        if (textObj) {
+          textObj.set('backgroundColor', 'rgba(255, 255, 255, 0.8)');
+          fabricCanvas.renderAll();
+        }
+      },
+      'text:editing:exited': (e) => {
+        const textObj = e.target;
+        if (textObj) {
+          textObj.set('backgroundColor', 'transparent');
+          fabricCanvas.renderAll();
+          saveState();
+        }
       }
     });
 
-    // Handle text editing state
-    fabricCanvas.on('text:editing:entered', (e) => {
-      const textObj = e.target;
-      if (textObj) {
-        textObj.set('backgroundColor', 'rgba(255, 255, 255, 0.8)');
-        fabricCanvas.renderAll();
-      }
-    });
-
-    fabricCanvas.on('text:editing:exited', (e) => {
-      const textObj = e.target;
-      if (textObj) {
-        textObj.set('backgroundColor', 'transparent');
-        fabricCanvas.renderAll();
-      }
-    });
-    
     // Set up zoom and pan handlers
     fabricCanvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
@@ -225,9 +230,11 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     });
 
     return () => {
+      // Save state before disposing
+      saveCanvasState(fabricCanvas);
       fabricCanvas.dispose();
     };
-  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning, hasDraftLoaded]);
+  }, [showCanvasSizeSelector, canvasSize]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {

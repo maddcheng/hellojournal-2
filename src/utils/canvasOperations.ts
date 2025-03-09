@@ -48,18 +48,17 @@ export const updateBrush = (
     canvas.freeDrawingBrush = pencilBrush;
     canvas.isDrawingMode = true;
   } else if (tool === 'eraser') {
-    // For eraser, we use a white brush
     const eraserBrush = new PencilBrush(canvas);
-    eraserBrush.color = "#f9f8f4";
-    eraserBrush.width = brushSize * 2; // Make eraser a bit larger
+    eraserBrush.color = "#f9f8f4"; // Match canvas background color
+    eraserBrush.width = brushSize;
     canvas.freeDrawingBrush = eraserBrush;
     canvas.isDrawingMode = true;
-  } else if (tool === 'text') {
+  } else {
     canvas.isDrawingMode = false;
-  } else if (tool === 'lasso') {
-    canvas.isDrawingMode = false;
-    canvas.selection = true;
   }
+  
+  // Save state after brush update
+  saveCanvasState(canvas);
 };
 
 export const saveCanvasAsImage = (canvas: Canvas): void => {
@@ -124,24 +123,18 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
       offsetX: options.shadow.offsetX,
       offsetY: options.shadow.offsetY,
     }) : null,
+    selectable: true,
+    hasControls: true,
+    editable: true
   });
 
   canvas.add(textObj);
   canvas.setActiveObject(textObj);
   textObj.enterEditing();
   canvas.renderAll();
-
-  // Add event listeners for editing state
-  textObj.on('editing:entered', () => {
-    textObj.set('backgroundColor', 'rgba(255, 255, 255, 0.8)');
-    canvas.renderAll();
-  });
-
-  textObj.on('editing:exited', () => {
-    textObj.set('backgroundColor', options.backgroundColor || 'transparent');
-    canvas.renderAll();
-    saveCanvasState(canvas); // Auto-save when text editing is done
-  });
+  
+  // Save state after adding text
+  saveCanvasState(canvas);
 
   return textObj;
 };
@@ -222,15 +215,45 @@ export const resizeObject = (canvas: Canvas, scaleChange: number): void => {
 
 export const saveCanvasState = (canvas: Canvas): void => {
   if (!canvas) return;
-  const json = JSON.stringify(canvas.toJSON());
+  
+  // Ensure all objects are included in the JSON
+  const json = JSON.stringify(canvas.toJSON(['selectable', 'hasControls']));
   localStorage.setItem(DRAFT_KEY, json);
+  console.log('Canvas state saved:', json); // Debug log
 };
 
 export const loadDraft = (canvas: Canvas): boolean => {
   const draft = localStorage.getItem(DRAFT_KEY);
   if (draft) {
-    loadCanvasFromJSON(canvas, draft);
-    return true;
+    try {
+      canvas.loadFromJSON(draft, () => {
+        // Restore canvas properties
+        canvas.renderAll();
+        
+        // Ensure all objects have correct properties
+        canvas.getObjects().forEach(obj => {
+          if (obj instanceof IText) {
+            obj.set({
+              selectable: true,
+              hasControls: true,
+              editable: true
+            });
+          } else {
+            obj.set({
+              selectable: true,
+              hasControls: true
+            });
+          }
+        });
+        
+        canvas.renderAll();
+      });
+      console.log('Draft loaded successfully'); // Debug log
+      return true;
+    } catch (error) {
+      console.error('Error loading draft:', error);
+      return false;
+    }
   }
   return false;
 };
