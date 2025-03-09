@@ -124,8 +124,13 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     const containerHeight = containerRef.current?.clientHeight || canvasSize.height;
     const translateX = (containerWidth - canvasSize.width) / 2;
     const translateY = (containerHeight - canvasSize.height) / 2;
+    
+    // Set initial viewport transform
     fabricCanvas.setViewportTransform([1, 0, 0, 1, translateX, translateY]);
     setViewportTransform([1, 0, 0, 1, translateX, translateY]);
+    
+    // Enable selection by default
+    fabricCanvas.selection = true;
     
     // Try to load draft only once when canvas is first created
     if (!hasDraftLoaded) {
@@ -145,29 +150,29 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       const obj = e.target;
       if (obj instanceof IText) {
         obj.set({
-          selectable: true
+          selectable: true,
+          editable: true
         });
         fabricCanvas.setActiveObject(obj);
+      }
+      
+      // Save state after adding object
+      if (fabricCanvas) {
+        const json = JSON.stringify(fabricCanvas.toJSON());
+        setHistory(prev => {
+          const newHistory = [...prev.slice(0, historyIndex + 1), json];
+          setHistoryIndex(prev => prev + 1);
+          setCanUndo(true);
+          setCanRedo(false);
+          return newHistory;
+        });
+        saveCanvasState(fabricCanvas);
       }
     });
 
     // Canvas event listeners for history and auto-save
     fabricCanvas.on('object:modified', () => {
       saveCanvasState(fabricCanvas);
-    });
-
-    fabricCanvas.on('object:added', () => {
-      if (canvas) {
-        const json = JSON.stringify(canvas.toJSON());
-        setHistory(prev => {
-          const newHistory = [...prev.slice(0, historyIndex + 1), json];
-          setHistoryIndex(historyIndex + 1);
-          setCanUndo(true);
-          setCanRedo(false);
-          return newHistory;
-        });
-        saveCanvasState(canvas);
-      }
     });
 
     // Handle text editing state
@@ -221,6 +226,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       if (isPanning) {
         fabricCanvas.selection = false;
         fabricCanvas.isDrawingMode = false;
+        fabricCanvas.defaultCursor = 'grab';
         fabricCanvas.setCursor('grab');
         const pointer = fabricCanvas.getPointer(opt.e);
         lastPointer.current = pointer;
@@ -229,24 +235,24 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
     fabricCanvas.on('mouse:move', (opt) => {
       if (isPanning && opt.e && 'buttons' in opt.e && opt.e.buttons === 1) {
+        fabricCanvas.setCursor('grabbing');
+        const pointer = fabricCanvas.getPointer(opt.e);
         const transform = fabricCanvas.viewportTransform;
         if (!transform) return;
 
-        const currentPointer = fabricCanvas.getPointer(opt.e);
-        transform[4] += currentPointer.x - lastPointer.current.x;
-        transform[5] += currentPointer.y - lastPointer.current.y;
+        transform[4] += pointer.x - lastPointer.current.x;
+        transform[5] += pointer.y - lastPointer.current.y;
         
         fabricCanvas.setViewportTransform(transform);
         setViewportTransform([...transform]);
-        lastPointer.current = currentPointer;
+        lastPointer.current = pointer;
+        fabricCanvas.requestRenderAll();
       }
     });
 
     fabricCanvas.on('mouse:up', () => {
       if (isPanning) {
-        fabricCanvas.setCursor('default');
-        fabricCanvas.selection = true;
-        updateBrush(fabricCanvas, tool, tool === 'eraser' ? eraserSize : brushSize, penColor);
+        fabricCanvas.setCursor('grab');
       }
     });
 
@@ -258,9 +264,29 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   // Update brush when tool/size/color changes
   useEffect(() => {
     if (!canvas) return;
-    const size = tool === 'eraser' ? eraserSize : brushSize;
-    updateBrush(canvas, tool, size, penColor);
-  }, [tool, brushSize, eraserSize, penColor, canvas]);
+    
+    // Reset cursor and selection based on tool
+    if (isPanning) {
+      canvas.defaultCursor = 'grab';
+      canvas.setCursor('grab');
+      canvas.selection = false;
+      canvas.isDrawingMode = false;
+    } else {
+      canvas.defaultCursor = 'default';
+      canvas.setCursor('default');
+      canvas.selection = true;
+      
+      if (tool === 'pen' || tool === 'eraser') {
+        canvas.isDrawingMode = true;
+        const size = tool === 'eraser' ? eraserSize : brushSize;
+        updateBrush(canvas, tool, size, penColor);
+      } else {
+        canvas.isDrawingMode = false;
+      }
+    }
+    
+    canvas.requestRenderAll();
+  }, [tool, brushSize, eraserSize, penColor, canvas, isPanning]);
 
   const handleCanvasSizeSelect = (width: number, height: number) => {
     setCanvasSize({ width, height });
