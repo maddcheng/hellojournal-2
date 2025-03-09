@@ -30,6 +30,7 @@ import { Select } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import HSBColorPicker from './drawing/HSBColorPicker';
+import CanvasSizeSelector from './drawing/CanvasSizeSelector';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -49,6 +50,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [tool, setTool] = useState<Tool>('pen');
   const [brushSize, setBrushSize] = useState(2);
+  const [eraserSize, setEraserSize] = useState(20);
   const [penColor, setPenColor] = useState("#000000");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -58,8 +60,9 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const { toast } = useToast();
   const [title, setTitle] = useState('Untitled');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [strokeWidth, setStrokeWidth] = useState(2);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showCanvasSizeSelector, setShowCanvasSizeSelector] = useState(true);
+  const [canvasSize, setCanvasSize] = useState({ width, height });
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -99,11 +102,11 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     "#33FFF3", "#F3FF33", "#FF33F3", "#8B5CF6", "#F97316", "#0EA5E9"
   ];
 
-  // Initialize the canvas
+  // Initialize the canvas with selected size
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || showCanvasSizeSelector) return;
 
-    const fabricCanvas = initializeCanvas(canvasRef.current, width, height);
+    const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
     
     // Try to load draft
@@ -115,6 +118,17 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       });
     }
     
+    // Make all IText objects editable by default
+    fabricCanvas.on('object:added', (e) => {
+      const obj = e.target;
+      if (obj instanceof IText) {
+        obj.set({
+          selectable: true
+        });
+        fabricCanvas.setActiveObject(obj);
+      }
+    });
+
     // Canvas event listeners for history and auto-save
     fabricCanvas.on('object:modified', () => {
       saveCanvasState(fabricCanvas);
@@ -154,13 +168,19 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     return () => {
       fabricCanvas.dispose();
     };
-  }, []);
+  }, [showCanvasSizeSelector, canvasSize]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {
     if (!canvas) return;
-    updateBrush(canvas, tool, brushSize, penColor);
-  }, [tool, brushSize, penColor, canvas]);
+    const size = tool === 'eraser' ? eraserSize : brushSize;
+    updateBrush(canvas, tool, size, penColor);
+  }, [tool, brushSize, eraserSize, penColor, canvas]);
+
+  const handleCanvasSizeSelect = (width: number, height: number) => {
+    setCanvasSize({ width, height });
+    setShowCanvasSizeSelector(false);
+  };
 
   const handleUndo = () => {
     if (!canvas || historyIndex <= 0) return;
@@ -222,7 +242,10 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   const handleTextAdd = () => {
     if (!canvas) return;
-    const textObj = addText(canvas, 'Double click to edit', textOptions);
+    const textObj = addText(canvas, 'Double click to edit', {
+      ...textOptions,
+      selectable: true
+    });
     setTool('text');
   };
 
@@ -267,6 +290,14 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     }
   };
 
+  if (showCanvasSizeSelector) {
+    return (
+      <div className="w-full max-w-md mx-auto mt-8">
+        <CanvasSizeSelector onSizeSelect={handleCanvasSizeSelect} />
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col items-center", className)}>
       <div className="drawing-toolbar mb-4 flex items-center gap-2 p-4 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm flex-wrap justify-center">
@@ -299,25 +330,42 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
             </PopoverTrigger>
             <PopoverContent className="w-80 p-4">
               <div className="space-y-4">
-                <HSBColorPicker value={penColor} onChange={setPenColor} />
+                {tool !== 'eraser' && (
+                  <>
+                    <HSBColorPicker value={penColor} onChange={setPenColor} />
+                    <div className="space-y-2">
+                      <Label>Pen Width</Label>
+                      <div className="flex items-center space-x-2">
+                        <Slider
+                          value={[brushSize]}
+                          onValueChange={([value]) => setBrushSize(value)}
+                          min={1}
+                          max={50}
+                          step={1}
+                          className="flex-1"
+                        />
+                        <span className="w-12 text-sm text-right">{brushSize}px</span>
+                      </div>
+                    </div>
+                  </>
+                )}
                 
-                <div className="space-y-2">
-                  <Label>Stroke Width</Label>
-                  <div className="flex items-center space-x-2">
-                    <Slider
-                      value={[strokeWidth]}
-                      onValueChange={([value]) => {
-                        setStrokeWidth(value);
-                        setBrushSize(value);
-                      }}
-                      min={1}
-                      max={50}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-sm text-right">{strokeWidth}px</span>
+                {tool === 'eraser' && (
+                  <div className="space-y-2">
+                    <Label>Eraser Width</Label>
+                    <div className="flex items-center space-x-2">
+                      <Slider
+                        value={[eraserSize]}
+                        onValueChange={([value]) => setEraserSize(value)}
+                        min={5}
+                        max={100}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="w-12 text-sm text-right">{eraserSize}px</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </PopoverContent>
           </Popover>

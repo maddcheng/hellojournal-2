@@ -94,8 +94,9 @@ export interface TextOptions {
   fontWeight: 'normal' | 'bold';
   fontStyle: 'normal' | 'italic';
   underline: boolean;
-  backgroundColor?: string;
-  opacity?: number;
+  opacity: number;
+  backgroundColor: string;
+  selectable?: boolean;
   shadow?: {
     color: string;
     blur: number;
