@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
@@ -9,6 +10,7 @@ import BackButton from '@/components/BackButton';
 import { Save } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { loadCanvasFromJSON } from '@/utils/canvasOperations';
 
 const DrawJournal = () => {
   const [mode, setMode] = useState<'template' | 'draw'>('template');
@@ -24,17 +26,32 @@ const DrawJournal = () => {
     const draft = location.state?.draft;
     if (draft && canvasRef.current) {
       try {
-        const canvasData = JSON.parse(draft.content);
-        canvasRef.current.loadFromJSON(canvasData, () => {
-          setMode('draw');
-          setCustomPrompt(draft.title);
-          toast({
-            title: "Draft loaded successfully",
-            description: "You can continue editing your drawing",
-          });
-        });
+        console.log("Attempting to load draft:", draft);
+        setMode('draw');
+        setCustomPrompt(draft.title);
+        
+        // Use setTimeout to ensure the canvas is fully initialized
+        setTimeout(() => {
+          if (canvasRef.current) {
+            try {
+              loadCanvasFromJSON(canvasRef.current, draft.content, () => {
+                toast({
+                  title: "Draft loaded successfully",
+                  description: "You can continue editing your drawing",
+                });
+              });
+            } catch (error) {
+              console.error('Error loading draft content:', error);
+              toast({
+                title: "Error loading draft",
+                description: "There was a problem loading your draft",
+                variant: "destructive",
+              });
+            }
+          }
+        }, 500);
       } catch (error) {
-        console.error('Error loading draft:', error);
+        console.error('Error processing draft:', error);
         toast({
           title: "Error loading draft",
           description: "There was a problem loading your draft",
@@ -54,7 +71,18 @@ const DrawJournal = () => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const canvasData = canvas.toJSON();
+    // Ensure we're storing all necessary properties
+    const canvasData = canvas.toJSON([
+      'selectable', 
+      'hasControls', 
+      'lockMovementX',
+      'lockMovementY',
+      'lockRotation',
+      'lockScalingX',
+      'lockScalingY',
+      'editable'
+    ]);
+    
     const draft = {
       id: Date.now(),
       title: customPrompt || 'Untitled Draft',

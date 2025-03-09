@@ -110,7 +110,8 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   // Initialize the canvas with selected size
   useEffect(() => {
     if (!canvasRef.current || showCanvasSizeSelector) return;
-
+    
+    console.log("Initializing canvas with size:", canvasSize);
     const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
     
@@ -126,18 +127,43 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       }
     }
 
-    // Auto-save on any canvas change
-    const saveState = () => {
-      saveCanvasState(fabricCanvas);
-    };
-
     // Add event listeners for all possible changes
     fabricCanvas.on({
-      'object:modified': saveState,
-      'object:added': saveState,
-      'object:removed': saveState,
-      'path:created': saveState,
-      'selection:updated': saveState,
+      'object:modified': () => {
+        console.log("Object modified, saving state");
+        saveCanvasState(fabricCanvas);
+      },
+      'object:added': () => {
+        console.log("Object added, saving state");
+        saveCanvasState(fabricCanvas);
+      },
+      'object:removed': () => {
+        console.log("Object removed, saving state");
+        saveCanvasState(fabricCanvas);
+      },
+      'path:created': () => {
+        console.log("Path created, saving state");
+        saveCanvasState(fabricCanvas);
+      },
+      'selection:updated': () => {
+        const selectedObject = fabricCanvas.getActiveObject();
+        if (selectedObject && selectedObject.type === 'i-text') {
+          setShowTextOptions(true);
+          setTextOptions({
+            ...textOptions,
+            fontFamily: selectedObject.get('fontFamily') || textOptions.fontFamily,
+            fontSize: selectedObject.get('fontSize') || textOptions.fontSize,
+            fill: selectedObject.get('fill') || textOptions.fill,
+            textAlign: (selectedObject.get('textAlign') as 'left' | 'center' | 'right') || textOptions.textAlign,
+            fontWeight: selectedObject.get('fontWeight') || textOptions.fontWeight,
+            fontStyle: selectedObject.get('fontStyle') || textOptions.fontStyle,
+            underline: selectedObject.get('underline') || textOptions.underline,
+            opacity: selectedObject.get('opacity') || textOptions.opacity,
+            backgroundColor: selectedObject.get('backgroundColor') || textOptions.backgroundColor,
+          });
+        }
+        saveCanvasState(fabricCanvas);
+      },
       'selection:created': (e) => {
         const selectedObject = fabricCanvas.getActiveObject();
         if (selectedObject && selectedObject.type === 'i-text') {
@@ -159,8 +185,13 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       'selection:cleared': () => {
         setShowTextOptions(false);
       },
-      'text:changed': saveState,
-      'text:selection:changed': saveState,
+      'text:changed': () => {
+        console.log("Text changed, saving state");
+        saveCanvasState(fabricCanvas);
+      },
+      'text:selection:changed': () => {
+        saveCanvasState(fabricCanvas);
+      },
       'text:editing:entered': (e) => {
         const textObj = e.target;
         if (textObj) {
@@ -173,7 +204,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         if (textObj) {
           textObj.set('backgroundColor', 'transparent');
           fabricCanvas.renderAll();
-          saveState();
+          saveCanvasState(fabricCanvas);
         }
       }
     });
@@ -229,6 +260,11 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       }
     });
 
+    // Make sure to initially save the canvas state
+    setTimeout(() => {
+      saveCanvasState(fabricCanvas);
+    }, 500);
+
     return () => {
       // Save state before disposing
       saveCanvasState(fabricCanvas);
@@ -241,6 +277,9 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     if (!canvas) return;
     const size = tool === 'eraser' ? eraserSize : brushSize;
     updateBrush(canvas, tool, size, penColor);
+    
+    // When tool changes, make sure we save the state after updating brush
+    saveCanvasState(canvas);
   }, [tool, brushSize, eraserSize, penColor, canvas]);
 
   const handleCanvasSizeSelect = (width: number, height: number) => {

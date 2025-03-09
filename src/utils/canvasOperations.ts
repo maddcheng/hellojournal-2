@@ -1,3 +1,4 @@
+
 import { Canvas, PencilBrush, Image as FabricImage, IText, Object as FabricObject, Shadow } from 'fabric';
 
 // Local storage keys
@@ -56,9 +57,6 @@ export const updateBrush = (
   } else {
     canvas.isDrawingMode = false;
   }
-  
-  // Save state after brush update
-  saveCanvasState(canvas);
 };
 
 export const saveCanvasAsImage = (canvas: Canvas): void => {
@@ -79,10 +77,14 @@ export const saveCanvasAsImage = (canvas: Canvas): void => {
 };
 
 export const loadCanvasFromJSON = (canvas: Canvas, json: string, callback?: () => void): void => {
-  canvas.loadFromJSON(json, () => {
-    canvas.renderAll();
-    if (callback) callback();
-  });
+  try {
+    canvas.loadFromJSON(json, () => {
+      canvas.renderAll();
+      if (callback) callback();
+    });
+  } catch (error) {
+    console.error("Error loading canvas from JSON:", error);
+  }
 };
 
 export interface TextOptions {
@@ -145,6 +147,9 @@ export const deleteSelectedObjects = (canvas: Canvas): void => {
     canvas.discardActiveObject(); // Clear selection first
     activeObjects.forEach(obj => canvas.remove(obj));
     canvas.renderAll();
+    
+    // Save state after deletion
+    saveCanvasState(canvas);
   }
 };
 
@@ -200,6 +205,9 @@ export const rotateObject = (canvas: Canvas, angle: number): void => {
   if (activeObject) {
     activeObject.rotate((activeObject.angle || 0) + angle);
     canvas.renderAll();
+    
+    // Save state after rotation
+    saveCanvasState(canvas);
   }
 };
 
@@ -210,56 +218,79 @@ export const resizeObject = (canvas: Canvas, scaleChange: number): void => {
     const newScale = currentScale + scaleChange;
     activeObject.scale(newScale);
     canvas.renderAll();
+    
+    // Save state after resizing
+    saveCanvasState(canvas);
   }
 };
 
 export const saveCanvasState = (canvas: Canvas): void => {
   if (!canvas) return;
   
-  // Ensure all objects are included in the JSON
-  const json = JSON.stringify(canvas.toJSON(['selectable', 'hasControls']));
-  localStorage.setItem(DRAFT_KEY, json);
-  console.log('Canvas state saved:', json); // Debug log
+  try {
+    // Make sure to include all necessary object properties in the JSON
+    const json = JSON.stringify(canvas.toJSON([
+      'selectable', 
+      'hasControls', 
+      'lockMovementX',
+      'lockMovementY',
+      'lockRotation',
+      'lockScalingX',
+      'lockScalingY',
+      'editable'
+    ]));
+    
+    localStorage.setItem(DRAFT_KEY, json);
+    console.log('Canvas state saved successfully');
+  } catch (error) {
+    console.error('Error saving canvas state:', error);
+  }
 };
 
 export const loadDraft = (canvas: Canvas): boolean => {
   const draft = localStorage.getItem(DRAFT_KEY);
-  if (draft) {
-    try {
-      canvas.loadFromJSON(draft, () => {
-        // Restore canvas properties
-        canvas.renderAll();
-        
-        // Ensure all objects have correct properties
-        canvas.getObjects().forEach(obj => {
-          if (obj instanceof IText) {
-            obj.set({
-              selectable: true,
-              hasControls: true,
-              editable: true
-            });
-          } else {
-            obj.set({
-              selectable: true,
-              hasControls: true
-            });
-          }
-        });
-        
-        canvas.renderAll();
+  if (!draft) return false;
+  
+  try {
+    loadCanvasFromJSON(canvas, draft, () => {
+      // Restore canvas properties and ensure all objects have correct properties
+      canvas.getObjects().forEach(obj => {
+        if (obj instanceof IText) {
+          obj.set({
+            selectable: true,
+            hasControls: true,
+            editable: true
+          });
+        } else {
+          obj.set({
+            selectable: true,
+            hasControls: true
+          });
+        }
       });
-      console.log('Draft loaded successfully'); // Debug log
-      return true;
-    } catch (error) {
-      console.error('Error loading draft:', error);
-      return false;
-    }
+      canvas.renderAll();
+    });
+    console.log('Draft loaded successfully');
+    return true;
+  } catch (error) {
+    console.error('Error loading draft:', error);
+    return false;
   }
-  return false;
 };
 
 export const saveEntry = (canvas: Canvas, title: string = 'Untitled'): JournalEntry => {
-  const json = JSON.stringify(canvas.toJSON());
+  // Make sure to include all necessary object properties in the JSON
+  const json = JSON.stringify(canvas.toJSON([
+    'selectable', 
+    'hasControls', 
+    'lockMovementX',
+    'lockMovementY',
+    'lockRotation',
+    'lockScalingX',
+    'lockScalingY',
+    'editable'
+  ]));
+  
   const entry: JournalEntry = {
     id: Date.now().toString(),
     title,
