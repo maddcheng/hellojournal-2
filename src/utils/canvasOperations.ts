@@ -132,7 +132,7 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
 
   canvas.add(textObj);
   canvas.setActiveObject(textObj);
-  // Fix for error on line 223: enterEditing() doesn't accept arguments
+  // Fixed: enterEditing() doesn't accept arguments
   textObj.enterEditing();
   canvas.renderAll();
   
@@ -192,7 +192,7 @@ export const enableLassoSelection = (canvas: Canvas): void => {
   
   canvas.preserveObjectStacking = true;
   
-  // Fix for error on line 272: setViewportTransform takes a matrix array
+  // Fixed: setViewportTransform takes a matrix array
   canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
   canvas.centeredScaling = true;
 };
