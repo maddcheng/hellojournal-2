@@ -132,6 +132,7 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
 
   canvas.add(textObj);
   canvas.setActiveObject(textObj);
+  // Fix: Don't pass arguments to enterEditing() as it doesn't expect any
   textObj.enterEditing();
   canvas.renderAll();
   
@@ -196,6 +197,7 @@ export const enableLassoSelection = (canvas: Canvas): void => {
   canvas.preserveObjectStacking = true;
   
   // Center scaling point
+  // Fix: Don't pass arguments to setViewportTransform as it needs a matrix array
   canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
   canvas.centeredScaling = true;
 };
@@ -325,3 +327,4 @@ export const deleteEntry = (id: string): void => {
   const entries = getEntries().filter(entry => entry.id !== id);
   localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
 };
+
