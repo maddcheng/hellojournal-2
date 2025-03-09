@@ -157,6 +157,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Set up initial brush
     fabricCanvas.freeDrawingBrush.width = brushSize;
     fabricCanvas.freeDrawingBrush.color = penColor;
+    fabricCanvas.isDrawingMode = true;
     
     // Make all IText objects editable by default
     fabricCanvas.on('object:added', (e) => {
@@ -289,24 +290,25 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       canvas.setCursor('grab');
       canvas.selection = false;
       canvas.isDrawingMode = false;
+    } else if (tool === 'pen') {
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      canvas.freeDrawingBrush.width = brushSize;
+      canvas.freeDrawingBrush.color = penColor;
+      canvas.defaultCursor = 'crosshair';
+      canvas.setCursor('crosshair');
+    } else if (tool === 'eraser') {
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      canvas.freeDrawingBrush.width = eraserSize;
+      canvas.freeDrawingBrush.color = '#ffffff';
+      canvas.defaultCursor = 'crosshair';
+      canvas.setCursor('crosshair');
     } else {
       canvas.defaultCursor = 'default';
       canvas.setCursor('default');
       canvas.selection = true;
-      
-      if (tool === 'pen' || tool === 'eraser') {
-        canvas.isDrawingMode = true;
-        const size = tool === 'eraser' ? eraserSize : brushSize;
-        if (tool === 'eraser') {
-          canvas.freeDrawingBrush.width = size;
-          canvas.freeDrawingBrush.color = '#ffffff';
-        } else {
-          canvas.freeDrawingBrush.width = size;
-          canvas.freeDrawingBrush.color = penColor;
-        }
-      } else {
-        canvas.isDrawingMode = false;
-      }
+      canvas.isDrawingMode = false;
     }
     
     canvas.requestRenderAll();
@@ -394,13 +396,32 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     if (!canvas) return;
 
     if (newTool === 'lasso') {
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
+      canvas.defaultCursor = 'crosshair';
+      canvas.setCursor('crosshair');
       enableLassoSelection(canvas);
     } else if (newTool === 'text') {
       canvas.isDrawingMode = false;
       canvas.selection = true;
-    } else {
-      updateBrush(canvas, newTool, brushSize, penColor);
+      canvas.defaultCursor = 'text';
+      canvas.setCursor('text');
+    } else if (newTool === 'pen') {
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      canvas.freeDrawingBrush.width = brushSize;
+      canvas.freeDrawingBrush.color = penColor;
+      canvas.defaultCursor = 'crosshair';
+      canvas.setCursor('crosshair');
+    } else if (newTool === 'eraser') {
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      canvas.freeDrawingBrush.width = eraserSize;
+      canvas.freeDrawingBrush.color = '#ffffff';
+      canvas.defaultCursor = 'crosshair';
+      canvas.setCursor('crosshair');
     }
+    canvas.requestRenderAll();
   };
 
   const handleRotate = (clockwise: boolean) => {
