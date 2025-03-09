@@ -115,7 +115,16 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   useEffect(() => {
     if (!canvasRef.current || showCanvasSizeSelector || canvasInitialized) return;
 
-    const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
+    const fabricCanvas = new Canvas(canvasRef.current, {
+      width: canvasSize.width,
+      height: canvasSize.height,
+      backgroundColor: '#ffffff',
+      preserveObjectStacking: true,
+      selection: true,
+      renderOnAddRemove: true,
+      isDrawingMode: true
+    });
+    
     setCanvas(fabricCanvas);
     setCanvasInitialized(true);
 
@@ -145,6 +154,10 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       setHasDraftLoaded(true);
     }
     
+    // Set up initial brush
+    fabricCanvas.freeDrawingBrush.width = brushSize;
+    fabricCanvas.freeDrawingBrush.color = penColor;
+    
     // Make all IText objects editable by default
     fabricCanvas.on('object:added', (e) => {
       const obj = e.target;
@@ -172,6 +185,10 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
     // Canvas event listeners for history and auto-save
     fabricCanvas.on('object:modified', () => {
+      saveCanvasState(fabricCanvas);
+    });
+
+    fabricCanvas.on('path:created', () => {
       saveCanvasState(fabricCanvas);
     });
 
@@ -220,6 +237,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       
       opt.e.preventDefault();
       opt.e.stopPropagation();
+      fabricCanvas.requestRenderAll();
     });
 
     fabricCanvas.on('mouse:down', (opt) => {
@@ -279,7 +297,13 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       if (tool === 'pen' || tool === 'eraser') {
         canvas.isDrawingMode = true;
         const size = tool === 'eraser' ? eraserSize : brushSize;
-        updateBrush(canvas, tool, size, penColor);
+        if (tool === 'eraser') {
+          canvas.freeDrawingBrush.width = size;
+          canvas.freeDrawingBrush.color = '#ffffff';
+        } else {
+          canvas.freeDrawingBrush.width = size;
+          canvas.freeDrawingBrush.color = penColor;
+        }
       } else {
         canvas.isDrawingMode = false;
       }
