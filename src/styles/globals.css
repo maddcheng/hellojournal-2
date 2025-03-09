@@ -15,6 +15,18 @@
   flex-shrink: 0;
 }
 
+/* Canvas Container Styles */
+.canvas-container {
+  background-color: #e5e7eb; /* Light gray background */
+  padding: 2rem;
+  border-radius: 0.5rem;
+}
+
+.canvas-container canvas {
+  background-color: #ffffff !important; /* Pure white canvas */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
 /* HSB Color Picker Styles */
 .hue-slider .relative::before {
   content: '';
@@ -37,4 +49,11 @@
   background-color: transparent !important;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Text Options Popover */
+.text-options-popover {
+  z-index: 100;
+  max-height: 80vh;
+  overflow-y: auto;
 } 

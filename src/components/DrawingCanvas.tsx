@@ -39,6 +39,16 @@ interface DrawingCanvasProps {
   onSave?: (entry: JournalEntry) => void;
 }
 
+// Add font options as a constant
+const FONT_OPTIONS = [
+  { name: 'Sans Serif', value: 'Arial' },
+  { name: 'Serif', value: 'Times New Roman' },
+  { name: 'Monospace', value: 'Courier New' },
+  { name: 'Elegant', value: 'Georgia' },
+  { name: 'Clean', value: 'Verdana' },
+  { name: 'Modern', value: 'Helvetica' },
+] as const;
+
 export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   width = 600,
   height = 800,
@@ -67,6 +77,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const [isPanning, setIsPanning] = useState(false);
   const lastPointer = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hasDraftLoaded, setHasDraftLoaded] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -87,16 +98,6 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     }
   });
 
-  // Font options
-  const fontOptions = [
-    'Arial',
-    'Times New Roman',
-    'Courier New',
-    'Georgia',
-    'Verdana',
-    'Helvetica',
-  ];
-
   // Expose canvas instance through ref
   useImperativeHandle(ref, () => canvas, [canvas]);
 
@@ -113,13 +114,16 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
     
-    // Try to load draft
-    const hasDraft = loadDraft(fabricCanvas);
-    if (hasDraft) {
-      toast({
-        title: "Draft Recovered",
-        description: "Your previous work has been restored.",
-      });
+    // Try to load draft only once when canvas is first created
+    if (!hasDraftLoaded) {
+      const hasDraft = loadDraft(fabricCanvas);
+      if (hasDraft) {
+        toast({
+          title: "Draft Recovered",
+          description: "Your previous work has been restored.",
+        });
+        setHasDraftLoaded(true);
+      }
     }
     
     // Make all IText objects editable by default
@@ -223,7 +227,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     return () => {
       fabricCanvas.dispose();
     };
-  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning]);
+  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning, hasDraftLoaded]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {
@@ -494,7 +498,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
         {/* Text and Image Tools Group */}
         <div className="flex items-center gap-2">
-          <Popover open={showTextOptions} onOpenChange={setShowTextOptions}>
+          <Popover>
             <PopoverTrigger asChild>
               <div>
                 <ToolButton 
@@ -505,18 +509,23 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
                 />
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-4">
+            <PopoverContent className="text-options-popover w-80 p-4">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Font Family</Label>
-                  <Select
-                    value={textOptions.fontFamily}
-                    onValueChange={(value) => setTextOptions(prev => ({ ...prev, fontFamily: value }))}
-                  >
-                    {fontOptions.map(font => (
-                      <option key={font} value={font}>{font}</option>
+                  <Label>Typography</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {FONT_OPTIONS.map(font => (
+                      <Button
+                        key={font.value}
+                        variant={textOptions.fontFamily === font.value ? 'default' : 'outline'}
+                        onClick={() => setTextOptions(prev => ({ ...prev, fontFamily: font.value }))}
+                        className="w-full justify-start"
+                        style={{ fontFamily: font.value }}
+                      >
+                        {font.name}
+                      </Button>
                     ))}
-                  </Select>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
@@ -613,8 +622,10 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
                   />
                 </div>
                 
-                <div className="flex justify-end">
-                  <Button onClick={handleTextAdd}>Add Text</Button>
+                <div className="sticky bottom-0 pt-2 bg-white border-t">
+                  <Button onClick={handleTextAdd} className="w-full">
+                    Add Text
+                  </Button>
                 </div>
               </div>
             </PopoverContent>
