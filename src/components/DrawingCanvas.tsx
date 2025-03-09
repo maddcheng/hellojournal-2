@@ -80,6 +80,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasDraftLoaded, setHasDraftLoaded] = useState(false);
   const [canvasInitialized, setCanvasInitialized] = useState(false);
+  const [viewportTransform, setViewportTransform] = useState<number[]>([1, 0, 0, 1, 0, 0]);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -116,6 +117,14 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
     setCanvasInitialized(true);
+
+    // Center the canvas initially
+    const containerWidth = containerRef.current?.clientWidth || canvasSize.width;
+    const containerHeight = containerRef.current?.clientHeight || canvasSize.height;
+    const translateX = (containerWidth - canvasSize.width) / 2;
+    const translateY = (containerHeight - canvasSize.height) / 2;
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, translateX, translateY]);
+    setViewportTransform([1, 0, 0, 1, translateX, translateY]);
     
     // Try to load draft only once when canvas is first created
     if (!hasDraftLoaded) {
@@ -125,8 +134,8 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
           title: "Draft Recovered",
           description: "Your previous work has been restored.",
         });
-        setHasDraftLoaded(true);
       }
+      setHasDraftLoaded(true);
     }
     
     // Make all IText objects editable by default
@@ -191,7 +200,19 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       newZoom = Math.min(Math.max(0.1, newZoom), 5);
       
       const point = fabricCanvas.getPointer(opt.e);
-      fabricCanvas.zoomToPoint(new Point(point.x, point.y), newZoom);
+      const transform = fabricCanvas.viewportTransform;
+      if (!transform) return;
+
+      const px = point.x;
+      const py = point.y;
+      
+      transform[0] = newZoom;
+      transform[3] = newZoom;
+      transform[4] += (1 - newZoom) * px;
+      transform[5] += (1 - newZoom) * py;
+      
+      fabricCanvas.setViewportTransform(transform);
+      setViewportTransform([...transform]);
       setZoom(newZoom);
       
       opt.e.preventDefault();
@@ -210,11 +231,15 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
     fabricCanvas.on('mouse:move', (opt) => {
       if (isPanning && opt.e && 'buttons' in opt.e && opt.e.buttons === 1) {
+        const transform = fabricCanvas.viewportTransform;
+        if (!transform) return;
+
         const currentPointer = fabricCanvas.getPointer(opt.e);
-        const dx = currentPointer.x - lastPointer.current.x;
-        const dy = currentPointer.y - lastPointer.current.y;
+        transform[4] += currentPointer.x - lastPointer.current.x;
+        transform[5] += currentPointer.y - lastPointer.current.y;
         
-        fabricCanvas.relativePan(new Point(dx, dy));
+        fabricCanvas.setViewportTransform(transform);
+        setViewportTransform([...transform]);
         lastPointer.current = currentPointer;
       }
     });
@@ -365,8 +390,21 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Limit zoom
     newZoom = Math.min(Math.max(0.1, newZoom), 5);
     
-    const center = new Point(canvas.width! / 2, canvas.height! / 2);
-    canvas.zoomToPoint(center, newZoom);
+    const transform = canvas.viewportTransform;
+    if (!transform) return;
+
+    const center = {
+      x: canvas.width! / 2,
+      y: canvas.height! / 2
+    };
+    
+    transform[0] = newZoom;
+    transform[3] = newZoom;
+    transform[4] += (1 - newZoom) * center.x;
+    transform[5] += (1 - newZoom) * center.y;
+    
+    canvas.setViewportTransform(transform);
+    setViewportTransform([...transform]);
     setZoom(newZoom);
   };
 
@@ -760,7 +798,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       
       <div 
         ref={containerRef}
-        className="canvas-container shadow-paper overflow-auto rounded-lg bg-gray-200"
+        className="canvas-container shadow-paper overflow-hidden rounded-lg bg-gray-200"
         style={{
           width: '100%',
           maxWidth: '100vw',
@@ -769,15 +807,15 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
+          position: 'relative'
         }}
       >
         <div 
           style={{
-            position: 'relative',
-            width: canvasSize.width,
-            height: canvasSize.height,
+            position: 'absolute',
             backgroundColor: '#ffffff',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            transform: `matrix(${viewportTransform.join(', ')})`
           }}
         >
           <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
