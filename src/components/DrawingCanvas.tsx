@@ -31,7 +31,6 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import HSBColorPicker from './drawing/HSBColorPicker';
 import CanvasSizeSelector from './drawing/CanvasSizeSelector';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface DrawingCanvasProps {
   width?: number;
@@ -42,12 +41,12 @@ interface DrawingCanvasProps {
 
 // Update font options
 const FONT_OPTIONS = [
-  { name: 'Sans', value: 'Arial', sample: 'Aa' },
-  { name: 'Serif', value: 'Times New Roman', sample: 'Aa' },
-  { name: 'Mono', value: 'Courier New', sample: 'Aa' },
-  { name: 'Elegant', value: 'Georgia', sample: 'Aa' },
-  { name: 'Clean', value: 'Verdana', sample: 'Aa' },
-  { name: 'Modern', value: 'Helvetica', sample: 'Aa' },
+  { name: 'Sans Serif', value: 'Arial' },
+  { name: 'Serif', value: 'Times New Roman' },
+  { name: 'Monospace', value: 'Courier New' },
+  { name: 'Elegant', value: 'Georgia' },
+  { name: 'Clean', value: 'Verdana' },
+  { name: 'Modern', value: 'Helvetica' },
 ] as const;
 
 export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
@@ -79,9 +78,6 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const lastPointer = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasDraftLoaded, setHasDraftLoaded] = useState(false);
-  const [canvasInitialized, setCanvasInitialized] = useState(false);
-  const [viewportTransform, setViewportTransform] = useState<number[]>([1, 0, 0, 1, 0, 0]);
-  const [draftMessageShown, setDraftMessageShown] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -113,74 +109,31 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
   // Initialize the canvas with selected size
   useEffect(() => {
-    if (!canvasRef.current || showCanvasSizeSelector || canvasInitialized) return;
+    if (!canvasRef.current || showCanvasSizeSelector) return;
 
-    const fabricCanvas = new Canvas(canvasRef.current, {
-      width: canvasSize.width,
-      height: canvasSize.height,
-      backgroundColor: '#ffffff',
-      preserveObjectStacking: true,
-      selection: true,
-      renderOnAddRemove: true,
-      isDrawingMode: true
-    });
-    
+    const fabricCanvas = initializeCanvas(canvasRef.current, canvasSize.width, canvasSize.height);
     setCanvas(fabricCanvas);
-    setCanvasInitialized(true);
-
-    // Center the canvas initially
-    const containerWidth = containerRef.current?.clientWidth || canvasSize.width;
-    const containerHeight = containerRef.current?.clientHeight || canvasSize.height;
-    const translateX = (containerWidth - canvasSize.width) / 2;
-    const translateY = (containerHeight - canvasSize.height) / 2;
     
-    // Set initial viewport transform
-    fabricCanvas.setViewportTransform([1, 0, 0, 1, translateX, translateY]);
-    setViewportTransform([1, 0, 0, 1, translateX, translateY]);
-    
-    // Enable selection by default
-    fabricCanvas.selection = true;
-    
-    // Try to load draft only once when canvas is first created
+    // Try to load draft only once when canvas is first initialized
     if (!hasDraftLoaded) {
       const hasDraft = loadDraft(fabricCanvas);
-      if (hasDraft && !draftMessageShown) {
+      if (hasDraft) {
         toast({
           title: "Draft Recovered",
           description: "Your previous work has been restored.",
         });
-        setDraftMessageShown(true);
+        setHasDraftLoaded(true);
       }
-      setHasDraftLoaded(true);
     }
-    
-    // Set up initial brush
-    fabricCanvas.freeDrawingBrush.width = brushSize;
-    fabricCanvas.freeDrawingBrush.color = penColor;
-    fabricCanvas.isDrawingMode = true;
     
     // Make all IText objects editable by default
     fabricCanvas.on('object:added', (e) => {
       const obj = e.target;
       if (obj instanceof IText) {
         obj.set({
-          selectable: true,
-          editable: true
+          selectable: true
         });
         fabricCanvas.setActiveObject(obj);
-      }
-      
-      // Save state after adding object
-      if (fabricCanvas) {
-        const json = JSON.stringify(fabricCanvas.toJSON());
-        setHistory(prev => {
-          const newHistory = [...prev.slice(0, historyIndex + 1), json];
-          setHistoryIndex(prev => prev + 1);
-          setCanUndo(true);
-          setCanRedo(false);
-          return newHistory;
-        });
-        saveCanvasState(fabricCanvas);
       }
     });
 
@@ -189,8 +142,18 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       saveCanvasState(fabricCanvas);
     });
 
-    fabricCanvas.on('path:created', () => {
-      saveCanvasState(fabricCanvas);
+    fabricCanvas.on('object:added', () => {
+      if (canvas) {
+        const json = JSON.stringify(canvas.toJSON());
+        setHistory(prev => {
+          const newHistory = [...prev.slice(0, historyIndex + 1), json];
+          setHistoryIndex(historyIndex + 1);
+          setCanUndo(true);
+          setCanRedo(false);
+          return newHistory;
+        });
+        saveCanvasState(canvas);
+      }
     });
 
     // Handle text editing state
@@ -213,7 +176,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Set up zoom and pan handlers
     fabricCanvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
-      let newZoom = fabricCanvas.getZoom();
+      let newZoom = zoom;
       
       if (delta > 0) {
         newZoom *= 0.95;
@@ -224,28 +187,18 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       // Limit zoom
       newZoom = Math.min(Math.max(0.1, newZoom), 5);
       
-      const point = new Point(
-        opt.e.offsetX,
-        opt.e.offsetY
-      );
-      
-      fabricCanvas.zoomToPoint(point, newZoom);
+      const point = fabricCanvas.getPointer(opt.e);
+      fabricCanvas.zoomToPoint(new Point(point.x, point.y), newZoom);
       setZoom(newZoom);
-      
-      if (fabricCanvas.viewportTransform) {
-        setViewportTransform([...fabricCanvas.viewportTransform]);
-      }
       
       opt.e.preventDefault();
       opt.e.stopPropagation();
-      fabricCanvas.requestRenderAll();
     });
 
     fabricCanvas.on('mouse:down', (opt) => {
       if (isPanning) {
         fabricCanvas.selection = false;
         fabricCanvas.isDrawingMode = false;
-        fabricCanvas.defaultCursor = 'grab';
         fabricCanvas.setCursor('grab');
         const pointer = fabricCanvas.getPointer(opt.e);
         lastPointer.current = pointer;
@@ -254,65 +207,34 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
     fabricCanvas.on('mouse:move', (opt) => {
       if (isPanning && opt.e && 'buttons' in opt.e && opt.e.buttons === 1) {
-        fabricCanvas.setCursor('grabbing');
-        const pointer = fabricCanvas.getPointer(opt.e);
-        const transform = fabricCanvas.viewportTransform;
-        if (!transform) return;
-
-        transform[4] += pointer.x - lastPointer.current.x;
-        transform[5] += pointer.y - lastPointer.current.y;
+        const currentPointer = fabricCanvas.getPointer(opt.e);
+        const dx = currentPointer.x - lastPointer.current.x;
+        const dy = currentPointer.y - lastPointer.current.y;
         
-        fabricCanvas.setViewportTransform(transform);
-        setViewportTransform([...transform]);
-        lastPointer.current = pointer;
-        fabricCanvas.requestRenderAll();
+        fabricCanvas.relativePan(new Point(dx, dy));
+        lastPointer.current = currentPointer;
       }
     });
 
     fabricCanvas.on('mouse:up', () => {
       if (isPanning) {
-        fabricCanvas.setCursor('grab');
+        fabricCanvas.setCursor('default');
+        fabricCanvas.selection = true;
+        updateBrush(fabricCanvas, tool, tool === 'eraser' ? eraserSize : brushSize, penColor);
       }
     });
 
     return () => {
       fabricCanvas.dispose();
     };
-  }, [showCanvasSizeSelector, canvasSize, canvasInitialized]);
+  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning, hasDraftLoaded]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {
     if (!canvas) return;
-    
-    // Reset cursor and selection based on tool
-    if (isPanning) {
-      canvas.defaultCursor = 'grab';
-      canvas.setCursor('grab');
-      canvas.selection = false;
-      canvas.isDrawingMode = false;
-    } else if (tool === 'pen') {
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = penColor;
-      canvas.defaultCursor = 'crosshair';
-      canvas.setCursor('crosshair');
-    } else if (tool === 'eraser') {
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      canvas.freeDrawingBrush.width = eraserSize;
-      canvas.freeDrawingBrush.color = '#ffffff';
-      canvas.defaultCursor = 'crosshair';
-      canvas.setCursor('crosshair');
-    } else {
-      canvas.defaultCursor = 'default';
-      canvas.setCursor('default');
-      canvas.selection = true;
-      canvas.isDrawingMode = false;
-    }
-    
-    canvas.requestRenderAll();
-  }, [tool, brushSize, eraserSize, penColor, canvas, isPanning]);
+    const size = tool === 'eraser' ? eraserSize : brushSize;
+    updateBrush(canvas, tool, size, penColor);
+  }, [tool, brushSize, eraserSize, penColor, canvas]);
 
   const handleCanvasSizeSelect = (width: number, height: number) => {
     setCanvasSize({ width, height });
@@ -396,32 +318,13 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     if (!canvas) return;
 
     if (newTool === 'lasso') {
-      canvas.isDrawingMode = false;
-      canvas.selection = true;
-      canvas.defaultCursor = 'crosshair';
-      canvas.setCursor('crosshair');
       enableLassoSelection(canvas);
     } else if (newTool === 'text') {
       canvas.isDrawingMode = false;
       canvas.selection = true;
-      canvas.defaultCursor = 'text';
-      canvas.setCursor('text');
-    } else if (newTool === 'pen') {
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = penColor;
-      canvas.defaultCursor = 'crosshair';
-      canvas.setCursor('crosshair');
-    } else if (newTool === 'eraser') {
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      canvas.freeDrawingBrush.width = eraserSize;
-      canvas.freeDrawingBrush.color = '#ffffff';
-      canvas.defaultCursor = 'crosshair';
-      canvas.setCursor('crosshair');
+    } else {
+      updateBrush(canvas, newTool, brushSize, penColor);
     }
-    canvas.requestRenderAll();
   };
 
   const handleRotate = (clockwise: boolean) => {
@@ -449,7 +352,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const handleZoom = (zoomIn: boolean) => {
     if (!canvas) return;
     
-    let newZoom = canvas.getZoom();
+    let newZoom = zoom;
     if (zoomIn) {
       newZoom *= 1.1;
     } else {
@@ -459,17 +362,9 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Limit zoom
     newZoom = Math.min(Math.max(0.1, newZoom), 5);
     
-    const center = new Point(
-      canvas.width! / 2,
-      canvas.height! / 2
-    );
-    
+    const center = new Point(canvas.width! / 2, canvas.height! / 2);
     canvas.zoomToPoint(center, newZoom);
     setZoom(newZoom);
-    
-    if (canvas.viewportTransform) {
-      setViewportTransform([...canvas.viewportTransform]);
-    }
   };
 
   const handlePanToggle = () => {
@@ -614,119 +509,122 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
                 />
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-4" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+            <PopoverContent className="text-options-popover w-80 p-4" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Font Style</Label>
-                  <ToggleGroup 
-                    type="single" 
-                    value={textOptions.fontFamily}
-                    onValueChange={(value) => {
-                      if (value) setTextOptions(prev => ({ ...prev, fontFamily: value }));
-                    }}
-                    className="grid grid-cols-2 gap-2"
-                  >
+                  <div className="grid grid-cols-1 gap-2">
                     {FONT_OPTIONS.map(font => (
-                      <ToggleGroupItem
+                      <Button
                         key={font.value}
-                        value={font.value}
-                        aria-label={font.name}
-                        className="flex flex-col items-center p-2 gap-1"
+                        variant={textOptions.fontFamily === font.value ? 'default' : 'outline'}
+                        onClick={() => setTextOptions(prev => ({ ...prev, fontFamily: font.value }))}
+                        className="w-full justify-start"
+                        style={{ fontFamily: font.value }}
                       >
-                        <span className="text-sm font-normal">{font.name}</span>
-                        <span style={{ fontFamily: font.value }} className="text-lg">
-                          {font.sample}
+                        <span className="text-left">
+                          {font.name}
+                          <span className="ml-2 text-xs opacity-70">
+                            The quick brown fox
+                          </span>
                         </span>
-                      </ToggleGroupItem>
+                      </Button>
                     ))}
-                  </ToggleGroup>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Font Size</Label>
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[textOptions.fontSize]}
-                      onValueChange={([value]) => setTextOptions(prev => ({ ...prev, fontSize: value }))}
-                      min={8}
-                      max={72}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-sm text-right">{textOptions.fontSize}px</span>
-                  </div>
+                  <Input
+                    type="number"
+                    value={textOptions.fontSize}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                    min={8}
+                    max={72}
+                  />
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={textOptions.fill}
-                      onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
-                      className="w-12 h-8 p-0 border-0"
-                    />
-                    <Input
-                      type="text"
-                      value={textOptions.fill}
-                      onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
-                      className="flex-1"
-                      placeholder="#000000"
-                    />
-                  </div>
+                  <Input
+                    type="color"
+                    value={textOptions.fill}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, fill: e.target.value }))}
+                  />
                 </div>
                 
-                <div className="flex justify-between gap-2">
-                  <ToggleGroup type="multiple" className="flex justify-start gap-1" value={[
-                    textOptions.fontWeight === 'bold' ? 'bold' : '',
-                    textOptions.fontStyle === 'italic' ? 'italic' : '',
-                    textOptions.underline ? 'underline' : '',
-                  ].filter(Boolean)}
-                  onValueChange={(values) => {
-                    setTextOptions(prev => ({
-                      ...prev,
-                      fontWeight: values.includes('bold') ? 'bold' : 'normal',
-                      fontStyle: values.includes('italic') ? 'italic' : 'normal',
-                      underline: values.includes('underline'),
-                    }));
-                  }}>
-                    <ToggleGroupItem value="bold" aria-label="Bold">
-                      B
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="italic" aria-label="Italic">
-                      I
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="underline" aria-label="Underline">
-                      U
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-
-                  <ToggleGroup type="single" value={textOptions.textAlign} onValueChange={(value: any) => handleTextAlignment(value)}>
-                    <ToggleGroupItem value="left" aria-label="Align left">
+                <div className="flex space-x-2">
+                  <Button
+                    variant={textOptions.fontWeight === 'bold' ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' 
+                    }))}
+                  >
+                    B
+                  </Button>
+                  <Button
+                    variant={textOptions.fontStyle === 'italic' ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' 
+                    }))}
+                  >
+                    I
+                  </Button>
+                  <Button
+                    variant={textOptions.underline ? 'default' : 'outline'}
+                    onClick={() => setTextOptions(prev => ({ 
+                      ...prev, 
+                      underline: !prev.underline 
+                    }))}
+                  >
+                    U
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Text Alignment</Label>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant={textOptions.textAlign === 'left' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('left')}
+                    >
                       <AlignLeft size={16} />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="center" aria-label="Align center">
+                    </Button>
+                    <Button
+                      variant={textOptions.textAlign === 'center' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('center')}
+                    >
                       <AlignCenter size={16} />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="right" aria-label="Align right">
+                    </Button>
+                    <Button
+                      variant={textOptions.textAlign === 'right' ? 'default' : 'outline'}
+                      onClick={() => handleTextAlignment('right')}
+                    >
                       <AlignRight size={16} />
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Opacity</Label>
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[textOptions.opacity || 1]}
-                      onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-sm text-right">{Math.round((textOptions.opacity || 1) * 100)}%</span>
-                  </div>
+                  <Slider
+                    value={[textOptions.opacity || 1]}
+                    onValueChange={([value]) => setTextOptions(prev => ({ ...prev, opacity: value }))}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Background Color</Label>
+                  <Input
+                    type="color"
+                    value={textOptions.backgroundColor || 'transparent'}
+                    onChange={(e) => setTextOptions(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                  />
                 </div>
                 
                 <div className="sticky bottom-0 pt-2 bg-white border-t">
@@ -862,28 +760,14 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       
       <div 
         ref={containerRef}
-        className="canvas-container shadow-paper overflow-hidden rounded-lg bg-gray-200"
+        className="canvas-container shadow-paper overflow-hidden rounded-lg bg-gray-200 p-4"
         style={{
-          width: '100%',
-          maxWidth: '100vw',
-          height: 'calc(100vh - 200px)',
-          padding: '2rem',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          position: 'relative'
+          maxWidth: '100%',
+          maxHeight: 'calc(100vh - 200px)',
+          overflow: 'hidden'
         }}
       >
-        <div 
-          style={{
-            position: 'absolute',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            transform: `matrix(${viewportTransform.join(', ')})`
-          }}
-        >
-          <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
-        </div>
+        <canvas ref={canvasRef} className={cn("touch-none bg-white", isPanning && "cursor-grab")} />
       </div>
     </div>
   );

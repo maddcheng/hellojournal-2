@@ -18,10 +18,7 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
   const fabricCanvas = new Canvas(canvasRef, {
     width,
     height,
-    backgroundColor: "#ffffff",
-    preserveObjectStacking: true,
-    renderOnAddRemove: true,
-    selection: true,
+    backgroundColor: "#f9f8f4", // Journal paper color
     isDrawingMode: true,
   });
   
@@ -30,9 +27,6 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
     fabricCanvas.freeDrawingBrush.color = "#000000";
     fabricCanvas.freeDrawingBrush.width = 2;
   }
-
-  // Set initial viewport transformation
-  fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
   
   return fabricCanvas;
 };
@@ -228,36 +222,15 @@ export const resizeObject = (canvas: Canvas, scaleChange: number): void => {
 
 export const saveCanvasState = (canvas: Canvas): void => {
   if (!canvas) return;
-  
-  // Store current zoom and pan
-  const viewport = canvas.viewportTransform;
-  const currentState = {
-    json: canvas.toJSON(),
-    viewport: viewport ? [...viewport] : [1, 0, 0, 1, 0, 0],
-    zoom: canvas.getZoom()
-  };
-  
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(currentState));
+  const json = JSON.stringify(canvas.toJSON());
+  localStorage.setItem(DRAFT_KEY, json);
 };
 
 export const loadDraft = (canvas: Canvas): boolean => {
-  const draftStr = localStorage.getItem(DRAFT_KEY);
-  if (!draftStr) return false;
-
-  try {
-    const draft = JSON.parse(draftStr);
-    if (draft.json) {
-      canvas.loadFromJSON(draft.json, () => {
-        // Restore viewport transformation if available
-        if (draft.viewport) {
-          canvas.setViewportTransform(draft.viewport);
-        }
-        canvas.renderAll();
-      });
-      return true;
-    }
-  } catch (error) {
-    console.error('Error loading draft:', error);
+  const draft = localStorage.getItem(DRAFT_KEY);
+  if (draft) {
+    loadCanvasFromJSON(canvas, draft);
+    return true;
   }
   return false;
 };
