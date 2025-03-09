@@ -81,6 +81,7 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const [hasDraftLoaded, setHasDraftLoaded] = useState(false);
   const [canvasInitialized, setCanvasInitialized] = useState(false);
   const [viewportTransform, setViewportTransform] = useState<number[]>([1, 0, 0, 1, 0, 0]);
+  const [draftMessageShown, setDraftMessageShown] = useState(false);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -129,11 +130,12 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Try to load draft only once when canvas is first created
     if (!hasDraftLoaded) {
       const hasDraft = loadDraft(fabricCanvas);
-      if (hasDraft) {
+      if (hasDraft && !draftMessageShown) {
         toast({
           title: "Draft Recovered",
           description: "Your previous work has been restored.",
         });
+        setDraftMessageShown(true);
       }
       setHasDraftLoaded(true);
     }
@@ -199,21 +201,17 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       // Limit zoom
       newZoom = Math.min(Math.max(0.1, newZoom), 5);
       
-      const point = fabricCanvas.getPointer(opt.e);
-      const transform = fabricCanvas.viewportTransform;
-      if (!transform) return;
-
-      const px = point.x;
-      const py = point.y;
+      const point = new Point(
+        opt.e.offsetX,
+        opt.e.offsetY
+      );
       
-      transform[0] = newZoom;
-      transform[3] = newZoom;
-      transform[4] += (1 - newZoom) * px;
-      transform[5] += (1 - newZoom) * py;
-      
-      fabricCanvas.setViewportTransform(transform);
-      setViewportTransform([...transform]);
+      fabricCanvas.zoomToPoint(point, newZoom);
       setZoom(newZoom);
+      
+      if (fabricCanvas.viewportTransform) {
+        setViewportTransform([...fabricCanvas.viewportTransform]);
+      }
       
       opt.e.preventDefault();
       opt.e.stopPropagation();
@@ -390,22 +388,17 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
     // Limit zoom
     newZoom = Math.min(Math.max(0.1, newZoom), 5);
     
-    const transform = canvas.viewportTransform;
-    if (!transform) return;
-
-    const center = {
-      x: canvas.width! / 2,
-      y: canvas.height! / 2
-    };
+    const center = new Point(
+      canvas.width! / 2,
+      canvas.height! / 2
+    );
     
-    transform[0] = newZoom;
-    transform[3] = newZoom;
-    transform[4] += (1 - newZoom) * center.x;
-    transform[5] += (1 - newZoom) * center.y;
-    
-    canvas.setViewportTransform(transform);
-    setViewportTransform([...transform]);
+    canvas.zoomToPoint(center, newZoom);
     setZoom(newZoom);
+    
+    if (canvas.viewportTransform) {
+      setViewportTransform([...canvas.viewportTransform]);
+    }
   };
 
   const handlePanToggle = () => {
