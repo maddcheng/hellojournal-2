@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { Canvas, IText } from 'fabric';
-import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut, Trash2, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Canvas, IText, Point } from 'fabric';
+import { PenLine, Eraser, Undo, Redo, Save, Type, Image as ImageIcon, Lasso, RotateCw, RotateCcw, ZoomIn, ZoomOut, Trash2, AlignLeft, AlignCenter, AlignRight, Move } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolButton } from './drawing/ToolButton';
 import { 
@@ -63,6 +63,10 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showCanvasSizeSelector, setShowCanvasSizeSelector] = useState(true);
   const [canvasSize, setCanvasSize] = useState({ width, height });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const lastPointer = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Text options
   const [textOptions, setTextOptions] = useState<TextOptions>({
@@ -165,10 +169,61 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       }
     });
     
+    // Set up zoom and pan handlers
+    fabricCanvas.on('mouse:wheel', (opt) => {
+      const delta = opt.e.deltaY;
+      let newZoom = zoom;
+      
+      if (delta > 0) {
+        newZoom *= 0.95;
+      } else {
+        newZoom *= 1.05;
+      }
+      
+      // Limit zoom
+      newZoom = Math.min(Math.max(0.1, newZoom), 5);
+      
+      const point = fabricCanvas.getPointer(opt.e);
+      fabricCanvas.zoomToPoint(new Point(point.x, point.y), newZoom);
+      setZoom(newZoom);
+      
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+    });
+
+    fabricCanvas.on('mouse:down', (opt) => {
+      if (isPanning) {
+        fabricCanvas.selection = false;
+        fabricCanvas.isDrawingMode = false;
+        fabricCanvas.setCursor('grab');
+        const pointer = fabricCanvas.getPointer(opt.e);
+        lastPointer.current = pointer;
+      }
+    });
+
+    fabricCanvas.on('mouse:move', (opt) => {
+      if (isPanning && opt.e && 'buttons' in opt.e && opt.e.buttons === 1) {
+        const currentPointer = fabricCanvas.getPointer(opt.e);
+        const dx = currentPointer.x - lastPointer.current.x;
+        const dy = currentPointer.y - lastPointer.current.y;
+        
+        fabricCanvas.relativePan(new Point(dx, dy));
+        lastPointer.current = currentPointer;
+      }
+    });
+
+    fabricCanvas.on('mouse:up', () => {
+      if (isPanning) {
+        fabricCanvas.setCursor('default');
+        fabricCanvas.selection = true;
+        updateBrush(fabricCanvas, tool, tool === 'eraser' ? eraserSize : brushSize, penColor);
+      }
+    });
+
     return () => {
       fabricCanvas.dispose();
     };
-  }, [showCanvasSizeSelector, canvasSize]);
+  }, [showCanvasSizeSelector, canvasSize, zoom, isPanning]);
 
   // Update brush when tool/size/color changes
   useEffect(() => {
@@ -289,6 +344,70 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
       }
     }
   };
+
+  const handleZoom = (zoomIn: boolean) => {
+    if (!canvas) return;
+    
+    let newZoom = zoom;
+    if (zoomIn) {
+      newZoom *= 1.1;
+    } else {
+      newZoom *= 0.9;
+    }
+    
+    // Limit zoom
+    newZoom = Math.min(Math.max(0.1, newZoom), 5);
+    
+    const center = new Point(canvas.width! / 2, canvas.height! / 2);
+    canvas.zoomToPoint(center, newZoom);
+    setZoom(newZoom);
+  };
+
+  const handlePanToggle = () => {
+    setIsPanning(!isPanning);
+    if (canvas) {
+      canvas.setCursor(isPanning ? 'default' : 'grab');
+    }
+  };
+
+  // Update text editing to be always available
+  useEffect(() => {
+    if (!canvas) return;
+
+    canvas.on('selection:created', (e) => {
+      const selectedObject = canvas.getActiveObject();
+      if (selectedObject && selectedObject.type === 'i-text') {
+        setShowTextOptions(true);
+        setTextOptions({
+          ...textOptions,
+          fontFamily: selectedObject.get('fontFamily') || textOptions.fontFamily,
+          fontSize: selectedObject.get('fontSize') || textOptions.fontSize,
+          fill: selectedObject.get('fill') || textOptions.fill,
+          textAlign: (selectedObject.get('textAlign') as 'left' | 'center' | 'right') || textOptions.textAlign,
+          fontWeight: selectedObject.get('fontWeight') || textOptions.fontWeight,
+          fontStyle: selectedObject.get('fontStyle') || textOptions.fontStyle,
+          underline: selectedObject.get('underline') || textOptions.underline,
+          opacity: selectedObject.get('opacity') || textOptions.opacity,
+          backgroundColor: selectedObject.get('backgroundColor') || textOptions.backgroundColor,
+        });
+      }
+    });
+
+    canvas.on('selection:cleared', () => {
+      setShowTextOptions(false);
+    });
+  }, [canvas]);
+
+  // Update text properties when options change
+  useEffect(() => {
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject && activeObject.type === 'i-text') {
+      activeObject.set(textOptions);
+      canvas.renderAll();
+      saveCanvasState(canvas);
+    }
+  }, [textOptions, canvas]);
 
   if (showCanvasSizeSelector) {
     return (
@@ -549,6 +668,29 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
 
         <div className="h-8 mx-1 border-r border-gray-200"></div>
 
+        {/* Add Zoom Controls Group */}
+        <div className="flex items-center gap-2">
+          <ToolButton 
+            onClick={() => handleZoom(true)}
+            icon={<ZoomIn size={18} />}
+            title="Zoom In"
+          />
+          <ToolButton 
+            onClick={() => handleZoom(false)}
+            icon={<ZoomOut size={18} />}
+            title="Zoom Out"
+          />
+          <ToolButton 
+            active={isPanning}
+            onClick={handlePanToggle}
+            icon={<Move size={18} />}
+            title="Pan Canvas"
+          />
+          <span className="text-sm text-gray-500">{Math.round(zoom * 100)}%</span>
+        </div>
+
+        <div className="h-8 mx-1 border-r border-gray-200"></div>
+
         {/* History and Save Tools Group */}
         <div className="flex items-center gap-2">
           <ToolButton 
@@ -600,8 +742,16 @@ export const DrawingCanvas = forwardRef<Canvas | null, DrawingCanvasProps>(({
         </PopoverContent>
       </Popover>
       
-      <div className="canvas-container shadow-paper overflow-hidden rounded-lg">
-        <canvas ref={canvasRef} className="touch-none" />
+      <div 
+        ref={containerRef}
+        className="canvas-container shadow-paper overflow-hidden rounded-lg"
+        style={{
+          maxWidth: '100%',
+          maxHeight: 'calc(100vh - 200px)',
+          overflow: 'hidden'
+        }}
+      >
+        <canvas ref={canvasRef} className={cn("touch-none", isPanning && "cursor-grab")} />
       </div>
     </div>
   );

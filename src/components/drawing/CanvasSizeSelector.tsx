@@ -1,8 +1,14 @@
 import React from 'react';
-import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { LayoutTemplate, Maximize2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface CanvasSize {
   name: string;
@@ -48,13 +54,18 @@ const CanvasSizeSelector: React.FC<CanvasSizeSelectorProps> = ({ onSizeSelect })
           value={selectedSize.name}
           onValueChange={handleSizeChange}
         >
-          {CANVAS_SIZES.map(size => (
-            <option key={size.name} value={size.name}>
-              {size.name} ({isLandscape ? 
-                `${Math.round(size.height/300)}″ × ${Math.round(size.width/300)}″` : 
-                `${Math.round(size.width/300)}″ × ${Math.round(size.height/300)}″`})
-            </option>
-          ))}
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a size" />
+          </SelectTrigger>
+          <SelectContent>
+            {CANVAS_SIZES.map(size => (
+              <SelectItem key={size.name} value={size.name}>
+                {size.name} ({isLandscape ? 
+                  `${Math.round(size.height/300)}″ × ${Math.round(size.width/300)}″` : 
+                  `${Math.round(size.width/300)}″ × ${Math.round(size.height/300)}″`})
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
 
