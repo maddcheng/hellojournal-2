@@ -1,4 +1,3 @@
-
 import { Canvas, PencilBrush, Image as FabricImage, IText, Object as FabricObject, Shadow } from 'fabric';
 
 // Local storage keys
@@ -132,11 +131,9 @@ export const addText = (canvas: Canvas, text: string, options: TextOptions): ITe
 
   canvas.add(textObj);
   canvas.setActiveObject(textObj);
-  // Fix: Don't pass arguments to enterEditing() as it doesn't expect any
   textObj.enterEditing();
   canvas.renderAll();
   
-  // Save state after adding text
   saveCanvasState(canvas);
 
   return textObj;
@@ -149,7 +146,6 @@ export const deleteSelectedObjects = (canvas: Canvas): void => {
     activeObjects.forEach(obj => canvas.remove(obj));
     canvas.renderAll();
     
-    // Save state after deletion
     saveCanvasState(canvas);
   }
 };
@@ -162,7 +158,6 @@ export const importImage = (canvas: Canvas, file: File): Promise<FabricImage> =>
       imgElement.src = e.target?.result as string;
       imgElement.onload = () => {
         const fabricImage = new FabricImage(imgElement);
-        // Scale image to fit within canvas while maintaining aspect ratio
         const scale = Math.min(
           (canvas.width! * 0.8) / fabricImage.width!,
           (canvas.height! * 0.8) / fabricImage.height!
@@ -177,7 +172,7 @@ export const importImage = (canvas: Canvas, file: File): Promise<FabricImage> =>
         canvas.add(fabricImage);
         canvas.setActiveObject(fabricImage);
         canvas.renderAll();
-        saveCanvasState(canvas); // Auto-save when image is added
+        saveCanvasState(canvas);
         resolve(fabricImage);
       };
     };
@@ -193,11 +188,8 @@ export const enableLassoSelection = (canvas: Canvas): void => {
   canvas.selectionBorderColor = '#0EA5E9';
   canvas.selectionLineWidth = 1;
   
-  // Ensure proper stacking order
   canvas.preserveObjectStacking = true;
   
-  // Center scaling point
-  // Fix: Don't pass arguments to setViewportTransform as it needs a matrix array
   canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
   canvas.centeredScaling = true;
 };
@@ -208,7 +200,6 @@ export const rotateObject = (canvas: Canvas, angle: number): void => {
     activeObject.rotate((activeObject.angle || 0) + angle);
     canvas.renderAll();
     
-    // Save state after rotation
     saveCanvasState(canvas);
   }
 };
@@ -221,7 +212,6 @@ export const resizeObject = (canvas: Canvas, scaleChange: number): void => {
     activeObject.scale(newScale);
     canvas.renderAll();
     
-    // Save state after resizing
     saveCanvasState(canvas);
   }
 };
@@ -230,7 +220,6 @@ export const saveCanvasState = (canvas: Canvas): void => {
   if (!canvas) return;
   
   try {
-    // Make sure to include all necessary object properties in the JSON
     const json = JSON.stringify(canvas.toJSON([
       'selectable', 
       'hasControls', 
@@ -255,7 +244,6 @@ export const loadDraft = (canvas: Canvas): boolean => {
   
   try {
     loadCanvasFromJSON(canvas, draft, () => {
-      // Restore canvas properties and ensure all objects have correct properties
       canvas.getObjects().forEach(obj => {
         if (obj instanceof IText) {
           obj.set({
@@ -281,7 +269,6 @@ export const loadDraft = (canvas: Canvas): boolean => {
 };
 
 export const saveEntry = (canvas: Canvas, title: string = 'Untitled'): JournalEntry => {
-  // Make sure to include all necessary object properties in the JSON
   const json = JSON.stringify(canvas.toJSON([
     'selectable', 
     'hasControls', 
@@ -306,7 +293,7 @@ export const saveEntry = (canvas: Canvas, title: string = 'Untitled'): JournalEn
   const entries = getEntries();
   entries.push(entry);
   localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
-  localStorage.removeItem(DRAFT_KEY); // Clear draft after saving
+  localStorage.removeItem(DRAFT_KEY);
   return entry;
 };
 
@@ -327,4 +314,3 @@ export const deleteEntry = (id: string): void => {
   const entries = getEntries().filter(entry => entry.id !== id);
   localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
 };
-
