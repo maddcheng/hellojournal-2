@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as fabric from 'fabric';
+import React, { useEffect, useRef, useState } from 'react';
 import { DrawingToolbar, DrawingTool } from './DrawingToolbar';
 
 interface DrawingCanvasProps {
@@ -14,149 +13,151 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   className
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasInstance = useRef<fabric.Canvas | null>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
   const [tool, setTool] = useState<DrawingTool>('brush');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [color, setColor] = useState({ h: 0, s: 100, b: 100 });
 
-  // Convert HSB to hex color
-  const getHexColor = useCallback(({ h, s, b }: { h: number; s: number; b: number }): string => {
+  // Convert HSB to RGB
+  const hsbToRgb = (h: number, s: number, b: number): string => {
     s /= 100;
     b /= 100;
     const k = (n: number) => (n + h / 60) % 6;
     const f = (n: number) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
-    return '#' + [f(5), f(3), f(1)]
-      .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-      .join('');
-  }, []);
+    return `rgb(${Math.round(f(5) * 255)}, ${Math.round(f(3) * 255)}, ${Math.round(f(1) * 255)})`;
+  };
 
-  // Setup canvas
+  // Initialize canvas
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Create canvas instance
-    const canvas = new fabric.Canvas(canvasRef.current);
-    canvas.setDimensions({ width, height });
-    canvas.backgroundColor = '#f9f8f4';
-    canvasInstance.current = canvas;
+    const canvas = canvasRef.current;
+    canvas.width = width;
+    canvas.height = height;
 
-    // Set up default brush
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = strokeWidth;
-    brush.color = getHexColor(color);
-    canvas.freeDrawingBrush = brush;
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-    // Enable drawing mode by default
-    canvas.isDrawingMode = true;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.strokeStyle = hsbToRgb(color.h, color.s, color.b);
+    context.lineWidth = strokeWidth;
+    context.fillStyle = '#f9f8f4';
+    context.fillRect(0, 0, width, height);
 
-    return () => {
-      canvas.dispose();
-      canvasInstance.current = null;
-    };
+    contextRef.current = context;
   }, [width, height]);
 
-  // Handle tool changes
-  const handleToolChange = useCallback((newTool: DrawingTool) => {
-    if (!canvasInstance.current) return;
-    const canvas = canvasInstance.current;
+  // Handle mouse/touch events
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!contextRef.current) return;
 
-    setTool(newTool);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    // Reset canvas state
-    canvas.discardActiveObject();
-    canvas.getObjects().forEach(obj => {
-      obj.selectable = false;
-      obj.hasControls = false;
-    });
+    isDrawingRef.current = true;
+    const point = getPoint(e, canvas);
+    lastPointRef.current = point;
 
-    switch (newTool) {
-      case 'brush':
-        canvas.isDrawingMode = true;
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = getHexColor(color);
-          canvas.freeDrawingBrush.width = strokeWidth;
-        }
-        break;
+    if (tool === 'brush' || tool === 'eraser') {
+      contextRef.current.beginPath();
+      contextRef.current.moveTo(point.x, point.y);
+    }
+  };
 
-      case 'eraser':
-        canvas.isDrawingMode = true;
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = '#f9f8f4';
-          canvas.freeDrawingBrush.width = strokeWidth;
-        }
-        break;
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawingRef.current || !contextRef.current || !lastPointRef.current) return;
 
-      case 'image':
-        canvas.isDrawingMode = false;
-        fileInputRef.current?.click();
-        break;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      case 'lasso':
-        canvas.isDrawingMode = false;
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = true;
-          obj.hasControls = false;
-        });
-        break;
+    e.preventDefault();
+    const point = getPoint(e, canvas);
 
-      case 'adjust':
-        canvas.isDrawingMode = false;
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = true;
-          obj.hasControls = true;
-        });
-        break;
+    if (tool === 'brush' || tool === 'eraser') {
+      contextRef.current.lineTo(point.x, point.y);
+      contextRef.current.stroke();
     }
 
-    canvas.requestRenderAll();
-  }, [color, strokeWidth, getHexColor]);
+    lastPointRef.current = point;
+  };
+
+  const stopDrawing = () => {
+    if (!contextRef.current) return;
+
+    if (tool === 'brush' || tool === 'eraser') {
+      contextRef.current.closePath();
+    }
+
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
+  };
+
+  const getPoint = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ('touches' in e ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = ('touches' in e ? e.touches[0].clientY : e.clientY) - rect.top;
+    return { x, y };
+  };
+
+  // Handle tool changes
+  const handleToolChange = (newTool: DrawingTool) => {
+    setTool(newTool);
+    if (!contextRef.current) return;
+
+    if (newTool === 'image') {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    contextRef.current.strokeStyle = newTool === 'eraser' 
+      ? '#f9f8f4' 
+      : hsbToRgb(color.h, color.s, color.b);
+  };
 
   // Handle brush width changes
-  const handleWidthChange = useCallback((width: number) => {
+  const handleWidthChange = (width: number) => {
     setStrokeWidth(width);
-    if (canvasInstance.current?.freeDrawingBrush) {
-      canvasInstance.current.freeDrawingBrush.width = width;
+    if (contextRef.current) {
+      contextRef.current.lineWidth = width;
     }
-  }, []);
+  };
 
   // Handle color changes
-  const handleColorChange = useCallback((newColor: { h: number; s: number; b: number }) => {
+  const handleColorChange = (newColor: { h: number; s: number; b: number }) => {
     setColor(newColor);
-    if (canvasInstance.current?.freeDrawingBrush && tool === 'brush') {
-      canvasInstance.current.freeDrawingBrush.color = getHexColor(newColor);
+    if (contextRef.current && tool === 'brush') {
+      contextRef.current.strokeStyle = hsbToRgb(newColor.h, newColor.s, newColor.b);
     }
-  }, [tool, getHexColor]);
+  };
 
   // Handle image uploads
-  const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !canvasInstance.current) return;
+    if (!file || !contextRef.current) return;
 
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const fabricImage = new fabric.Image(img);
-        
+        if (!contextRef.current) return;
+
         // Scale image to fit within canvas
         const scale = Math.min(
-          (width * 0.8) / fabricImage.width!,
-          (height * 0.8) / fabricImage.height!
+          (width * 0.8) / img.width,
+          (height * 0.8) / img.height
         );
 
-        fabricImage.scale(scale);
-        fabricImage.set({
-          left: (width - fabricImage.width! * scale) / 2,
-          top: (height - fabricImage.height! * scale) / 2,
-          selectable: true,
-          hasControls: true
-        });
+        const scaledWidth = img.width * scale;
+        const scaledHeight = img.height * scale;
+        const x = (width - scaledWidth) / 2;
+        const y = (height - scaledHeight) / 2;
 
-        canvasInstance.current?.add(fabricImage);
-        canvasInstance.current?.setActiveObject(fabricImage);
-        canvasInstance.current?.requestRenderAll();
+        contextRef.current.drawImage(img, x, y, scaledWidth, scaledHeight);
       };
       img.src = reader.result as string;
     };
@@ -164,7 +165,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
     // Reset file input
     event.target.value = '';
-  }, [width, height]);
+  };
 
   return (
     <div className="flex gap-4 p-4">
@@ -179,10 +180,18 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       <div className={className}>
         <canvas
           ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
           style={{
             border: '1px solid #ccc',
             borderRadius: '4px',
-            touchAction: 'none'
+            touchAction: 'none',
+            backgroundColor: '#f9f8f4'
           }}
         />
         <input
