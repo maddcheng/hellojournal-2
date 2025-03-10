@@ -14,197 +14,154 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   className
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasInstanceRef = useRef<fabric.Canvas | null>(null);
+  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentTool, setCurrentTool] = useState<DrawingTool>('brush');
-  const [brushWidth, setBrushWidth] = useState(2);
-  const [brushColor, setBrushColor] = useState({ h: 0, s: 100, b: 100 });
+  
+  const [tool, setTool] = useState<DrawingTool>('brush');
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [color, setColor] = useState({ h: 0, s: 100, b: 100 });
 
-  const hsbToHex = (h: number, s: number, b: number): string => {
-    const hue = h / 360;
-    const saturation = s / 100;
-    const brightness = b / 100;
-    
-    let r, g, b1;
-    const i = Math.floor(hue * 6);
-    const f = hue * 6 - i;
-    const p = brightness * (1 - saturation);
-    const q = brightness * (1 - f * saturation);
-    const t = brightness * (1 - (1 - f) * saturation);
-    
-    switch (i % 6) {
-      case 0: r = brightness; g = t; b1 = p; break;
-      case 1: r = q; g = brightness; b1 = p; break;
-      case 2: r = p; g = brightness; b1 = t; break;
-      case 3: r = p; g = q; b1 = brightness; break;
-      case 4: r = t; g = p; b1 = brightness; break;
-      case 5: r = brightness; g = p; b1 = q; break;
-      default: r = 0; g = 0; b1 = 0;
-    }
-    
-    const toHex = (x: number) => {
-      const hex = Math.round(x * 255).toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
+  // Initialize canvas only once
+  useEffect(() => {
+    if (!canvasRef.current || fabricCanvasRef.current) return;
+
+    const canvas = new fabric.Canvas(canvasRef.current, {
+      width,
+      height,
+      backgroundColor: '#f9f8f4',
+      isDrawingMode: true,
+      selection: false
+    });
+
+    // Set up initial brush
+    const brush = new fabric.PencilBrush(canvas);
+    brush.width = strokeWidth;
+    brush.color = '#000000';
+    brush.strokeLineCap = 'round';
+    brush.strokeLineJoin = 'round';
+    canvas.freeDrawingBrush = brush;
+
+    fabricCanvasRef.current = canvas;
+
+    // Cleanup on unmount
+    return () => {
+      canvas.dispose();
+      fabricCanvasRef.current = null;
     };
-    
-    return `#${toHex(r)}${toHex(g)}${toHex(b1)}`;
-  };
+  }, []);
 
-  const handleToolChange = (tool: DrawingTool) => {
-    if (!canvasInstanceRef.current) return;
-    const canvas = canvasInstanceRef.current;
+  // Handle tool changes
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
 
-    setCurrentTool(tool);
-    
+    const currentColor = tool === 'eraser' ? '#f9f8f4' : getColorFromHSB(color);
+
     switch (tool) {
       case 'brush':
-        canvas.isDrawingMode = true;
-        canvas.selection = false;
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = hsbToHex(brushColor.h, brushColor.s, brushColor.b);
-          canvas.freeDrawingBrush.width = brushWidth;
-        }
-        break;
-      
       case 'eraser':
         canvas.isDrawingMode = true;
         canvas.selection = false;
         if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = '#f9f8f4';
-          canvas.freeDrawingBrush.width = brushWidth;
+          canvas.freeDrawingBrush.width = strokeWidth;
+          canvas.freeDrawingBrush.color = currentColor;
         }
         break;
-      
-      case 'image':
-        canvas.isDrawingMode = false;
-        canvas.selection = true;
-        fileInputRef.current?.click();
-        break;
-      
+
       case 'lasso':
-        canvas.isDrawingMode = false;
-        canvas.selection = true;
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = true;
-          obj.evented = true;
-        });
-        break;
-      
       case 'adjust':
         canvas.isDrawingMode = false;
         canvas.selection = true;
         canvas.getObjects().forEach(obj => {
           obj.selectable = true;
-          obj.hasControls = true;
+          obj.hasControls = tool === 'adjust';
           obj.evented = true;
         });
         break;
+
+      case 'image':
+        canvas.isDrawingMode = false;
+        canvas.selection = true;
+        fileInputRef.current?.click();
+        break;
     }
+
+    canvas.requestRenderAll();
+  }, [tool, strokeWidth, color]);
+
+  // Color conversion utility
+  const getColorFromHSB = (hsb: { h: number; s: number; b: number }): string => {
+    const { h, s, b } = hsb;
+    const k = (n: number) => (n + h / 60) % 6;
+    const f = (n: number) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
+    const r = Math.round(255 * f(5));
+    const g = Math.round(255 * f(3));
+    const bl = Math.round(255 * f(1));
+    return `#${[r, g, bl].map(x => x.toString(16).padStart(2, '0')).join('')}`;
   };
 
-  const handleBrushWidthChange = (width: number) => {
-    setBrushWidth(width);
-    if (canvasInstanceRef.current?.freeDrawingBrush) {
-      canvasInstanceRef.current.freeDrawingBrush.width = width;
-    }
-  };
-
-  const handleBrushColorChange = (color: { h: number; s: number; b: number }) => {
-    setBrushColor(color);
-    if (currentTool === 'brush' && canvasInstanceRef.current?.freeDrawingBrush) {
-      canvasInstanceRef.current.freeDrawingBrush.color = hsbToHex(color.h, color.s, color.b);
-    }
-  };
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle image uploads
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !canvasInstanceRef.current) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const fabricImage = new fabric.Image(img);
-        
-        // Scale image to fit within canvas while maintaining aspect ratio
-        const scale = Math.min(
-          (width * 0.8) / fabricImage.width!,
-          (height * 0.8) / fabricImage.height!
-        );
-        
-        fabricImage.scale(scale);
-        fabricImage.set({
-          left: (width - fabricImage.width! * scale) / 2,
-          top: (height - fabricImage.height! * scale) / 2
-        });
-        
-        canvasInstanceRef.current?.add(fabricImage);
-        canvasInstanceRef.current?.setActiveObject(fabricImage);
-        canvasInstanceRef.current?.renderAll();
-        
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!file || !fabricCanvasRef.current) return;
 
     try {
-      if (canvasInstanceRef.current) {
-        canvasInstanceRef.current.dispose();
-      }
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
 
-      const canvas = new fabric.Canvas(canvasRef.current);
-      canvas.setDimensions({ width, height });
-      canvas.backgroundColor = '#f9f8f4';
-      canvas.isDrawingMode = true;
-      canvas.renderAll();
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.crossOrigin = 'anonymous';
+        image.src = dataUrl;
+      });
 
-      canvasInstanceRef.current = canvas;
+      const fabricImage = new fabric.Image(img);
+      
+      // Scale image to fit within canvas
+      const scale = Math.min(
+        (width * 0.8) / fabricImage.width!,
+        (height * 0.8) / fabricImage.height!
+      );
 
-      const pencilBrush = new fabric.PencilBrush(canvas);
-      pencilBrush.color = hsbToHex(brushColor.h, brushColor.s, brushColor.b);
-      pencilBrush.width = brushWidth;
-      pencilBrush.strokeLineCap = 'round';
-      pencilBrush.strokeLineJoin = 'round';
-      canvas.freeDrawingBrush = pencilBrush;
+      fabricImage.scale(scale);
+      fabricImage.set({
+        left: (width - fabricImage.width! * scale) / 2,
+        top: (height - fabricImage.height! * scale) / 2,
+        selectable: true,
+        hasControls: true
+      });
 
-      // Load any saved state here if needed
+      fabricCanvasRef.current.add(fabricImage);
+      fabricCanvasRef.current.setActiveObject(fabricImage);
+      fabricCanvasRef.current.requestRenderAll();
 
-      return () => {
-        canvas.dispose();
-      };
+      // Reset file input
+      event.target.value = '';
     } catch (error) {
-      console.error('Error in canvas initialization:', error);
+      console.error('Error loading image:', error);
     }
-  }, [width, height]);
+  };
 
   return (
     <div className="flex gap-4">
       <DrawingToolbar
-        currentTool={currentTool}
-        brushWidth={brushWidth}
-        brushColor={brushColor}
-        onToolChange={handleToolChange}
-        onBrushWidthChange={handleBrushWidthChange}
-        onBrushColorChange={handleBrushColorChange}
+        currentTool={tool}
+        brushWidth={strokeWidth}
+        brushColor={color}
+        onToolChange={setTool}
+        onBrushWidthChange={setStrokeWidth}
+        onBrushColorChange={setColor}
       />
       <div className={className}>
         <canvas
           ref={canvasRef}
-          width={width}
-          height={height}
           style={{
             border: '1px solid #ccc',
-            backgroundColor: '#f9f8f4',
             touchAction: 'none'
           }}
         />
