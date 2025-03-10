@@ -17,9 +17,6 @@ export interface JournalEntry {
 export type Tool = 'pen' | 'eraser' | 'text' | 'lasso';
 
 export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, height: number): fabric.Canvas => {
-  console.log('Initializing canvas with dimensions:', width, height);
-  
-  // Create canvas instance
   const fabricCanvas = new fabric.Canvas(canvasRef, {
     width,
     height,
@@ -29,7 +26,6 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
     preserveObjectStacking: true,
   });
 
-  // Initialize brush
   const pencilBrush = new fabric.PencilBrush(fabricCanvas);
   pencilBrush.color = "#000000";
   pencilBrush.width = 2;
@@ -37,7 +33,6 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
   pencilBrush.strokeLineJoin = 'round';
   fabricCanvas.freeDrawingBrush = pencilBrush;
 
-  // Basic event handlers
   fabricCanvas.on('object:added', (e) => {
     const obj = e.target;
     if (!obj) return;
@@ -100,48 +95,17 @@ export const saveCanvasState = (canvas: fabric.Canvas): void => {
   try {
     const objects = canvas.getObjects();
     if (objects.length === 0) {
-      console.log('No objects to save');
       localStorage.removeItem(DRAFT_KEY);
       return;
     }
-
-    console.log('Saving canvas state with objects:', objects.length);
     
-    // Prepare canvas state with all necessary properties
     const canvasState = {
       version: '1.0',
       timestamp: Date.now(),
-      canvasData: canvas.toJSON([
-        'selectable',
-        'hasControls',
-        'editable',
-        'evented',
-        'backgroundColor',
-        'strokeWidth',
-        'stroke',
-        'fill',
-        'path',
-        'strokeLineCap',
-        'strokeLineJoin',
-        'perPixelTargetFind',
-        'type',
-        'width',
-        'height',
-        'scaleX',
-        'scaleY',
-        'angle',
-        'left',
-        'top',
-        'flipX',
-        'flipY',
-        'opacity',
-        'src',
-        'crossOrigin'
-      ])
+      canvasData: canvas.toObject()
     };
     
     localStorage.setItem(DRAFT_KEY, JSON.stringify(canvasState));
-    console.log('Canvas state saved successfully');
   } catch (error) {
     console.error('Error saving canvas state:', error);
   }
@@ -150,29 +114,15 @@ export const saveCanvasState = (canvas: fabric.Canvas): void => {
 export const loadDraft = (canvas: fabric.Canvas): boolean => {
   try {
     const draftData = localStorage.getItem(DRAFT_KEY);
-    if (!draftData) {
-      console.log('No draft found in localStorage');
-      return false;
-    }
-
-    console.log('Loading draft from localStorage');
+    if (!draftData) return false;
     
     const canvasState = JSON.parse(draftData);
-    if (!canvasState.canvasData) {
-      console.log('Invalid draft data');
-      return false;
-    }
+    if (!canvasState.canvasData) return false;
 
-    // Clear existing objects
     canvas.clear();
     
-    // Load saved state
     canvas.loadFromJSON(canvasState.canvasData, () => {
-      console.log('Draft JSON loaded, object count:', canvas.getObjects().length);
-      
-      // Restore object properties
       canvas.getObjects().forEach(obj => {
-        // Set common properties
         obj.set({
           selectable: true,
           hasControls: true,
@@ -180,11 +130,8 @@ export const loadDraft = (canvas: fabric.Canvas): boolean => {
           perPixelTargetFind: true,
         });
 
-        // Handle specific object types
         if (obj.type === 'i-text') {
-          obj.set({
-            editable: true,
-          });
+          obj.set({ editable: true });
         }
         if (obj.type === 'path') {
           obj.set({
@@ -196,7 +143,6 @@ export const loadDraft = (canvas: fabric.Canvas): boolean => {
       });
       
       canvas.renderAll();
-      console.log('Canvas rendered after loading draft');
     });
 
     return true;
