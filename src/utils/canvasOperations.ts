@@ -1,4 +1,4 @@
-import { Canvas, PencilBrush } from 'fabric';
+import * as fabric from 'fabric';
 
 // Local storage keys
 const DRAFT_KEY = 'journal_draft';
@@ -16,11 +16,11 @@ export interface JournalEntry {
 
 export type Tool = 'pen' | 'eraser' | 'text' | 'lasso';
 
-export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, height: number): Canvas => {
+export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, height: number): fabric.Canvas => {
   console.log('Initializing canvas with dimensions:', width, height);
   
   // Create canvas instance
-  const fabricCanvas = new Canvas(canvasRef, {
+  const fabricCanvas = new fabric.Canvas(canvasRef, {
     width,
     height,
     backgroundColor: "#f9f8f4",
@@ -30,7 +30,7 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
   });
 
   // Initialize brush
-  const pencilBrush = new PencilBrush(fabricCanvas);
+  const pencilBrush = new fabric.PencilBrush(fabricCanvas);
   pencilBrush.color = "#000000";
   pencilBrush.width = 2;
   pencilBrush.strokeLineCap = 'round';
@@ -66,7 +66,7 @@ export const initializeCanvas = (canvasRef: HTMLCanvasElement, width: number, he
 };
 
 export const updateBrush = (
-  canvas: Canvas, 
+  canvas: fabric.Canvas, 
   tool: Tool, 
   brushSize: number,
   penColor: string = "#000000"
@@ -77,7 +77,7 @@ export const updateBrush = (
   canvas.selection = !canvas.isDrawingMode;
 
   if (tool === 'pen' || tool === 'eraser') {
-    const brush = new PencilBrush(canvas);
+    const brush = new fabric.PencilBrush(canvas);
     brush.width = brushSize;
     brush.strokeLineCap = 'round';
     brush.strokeLineJoin = 'round';
@@ -94,7 +94,7 @@ export const updateBrush = (
   canvas.requestRenderAll();
 };
 
-export const saveCanvasState = (canvas: Canvas): void => {
+export const saveCanvasState = (canvas: fabric.Canvas): void => {
   if (!canvas) return;
   
   try {
@@ -147,7 +147,7 @@ export const saveCanvasState = (canvas: Canvas): void => {
   }
 };
 
-export const loadDraft = (canvas: Canvas): boolean => {
+export const loadDraft = (canvas: fabric.Canvas): boolean => {
   try {
     const draftData = localStorage.getItem(DRAFT_KEY);
     if (!draftData) {

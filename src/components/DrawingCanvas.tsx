@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Canvas, PencilBrush } from 'fabric';
+import * as fabric from 'fabric';
 import { initializeCanvas, updateBrush, Tool, saveCanvasState, loadDraft } from '@/utils/canvasOperations';
 
 interface DrawingCanvasProps {
@@ -14,77 +14,109 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   className
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasInstanceRef = useRef<Canvas | null>(null);
+  const canvasInstanceRef = useRef<fabric.Canvas | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize canvas
   useEffect(() => {
-    if (!canvasRef.current || isInitialized) return;
+    if (!canvasRef.current || isInitialized) {
+      console.log('Canvas ref not ready or already initialized');
+      return;
+    }
 
-    console.log('Initializing canvas...');
+    console.log('Starting canvas initialization...', { width, height });
 
     try {
       // Clean up any existing canvas instance
       if (canvasInstanceRef.current) {
+        console.log('Disposing existing canvas instance');
         canvasInstanceRef.current.dispose();
       }
 
       // Create new canvas instance
-      const fabricCanvas = new Canvas(canvasRef.current, {
-        width,
-        height,
-        backgroundColor: "#f9f8f4",
-        isDrawingMode: true,
-        selection: true,
-        preserveObjectStacking: true,
+      console.log('Creating new fabric.Canvas instance');
+      const fabricCanvas = new fabric.Canvas(canvasRef.current);
+      
+      // Set canvas dimensions and properties
+      fabricCanvas.setDimensions({
+        width: width,
+        height: height
       });
+      fabricCanvas.backgroundColor = '#f9f8f4';
+      fabricCanvas.isDrawingMode = true;
+      fabricCanvas.selection = true;
+      fabricCanvas.preserveObjectStacking = true;
+
+      // Force initial render
+      fabricCanvas.renderAll();
+
+      // Verify canvas creation
+      if (!fabricCanvas) {
+        throw new Error('Failed to create fabric.Canvas instance');
+      }
 
       canvasInstanceRef.current = fabricCanvas;
-      console.log('Canvas instance created');
+      console.log('Canvas instance created successfully');
 
       // Set initial brush
-      const pencilBrush = new PencilBrush(fabricCanvas);
+      console.log('Setting up initial brush');
+      const pencilBrush = new fabric.PencilBrush(fabricCanvas);
       pencilBrush.color = "#000000";
       pencilBrush.width = 2;
       pencilBrush.strokeLineCap = 'round';
       pencilBrush.strokeLineJoin = 'round';
       fabricCanvas.freeDrawingBrush = pencilBrush;
-      console.log('Initial brush set');
 
       // Try to load existing draft
+      console.log('Attempting to load existing draft');
       const hasDraft = loadDraft(fabricCanvas);
-      if (hasDraft) {
-        console.log('Loaded existing draft');
-      }
+      console.log('Draft load result:', hasDraft);
 
       // Set up event listeners for canvas changes
       const saveTimeout = 1000; // 1 second debounce
       let timeoutId: NodeJS.Timeout;
 
-      const handleCanvasChange = () => {
-        console.log('Canvas change detected');
+      const handleCanvasChange = (e: any) => {
+        console.log('Canvas change detected', e.type);
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
         timeoutId = setTimeout(() => {
-          console.log('Saving canvas state after change');
+          if (!fabricCanvas) return;
+          console.log('Saving canvas state');
+          const objects = fabricCanvas.getObjects();
+          console.log('Current objects on canvas:', objects.length);
           saveCanvasState(fabricCanvas);
         }, saveTimeout);
       };
 
       // Add event listeners for all relevant canvas events
+      console.log('Setting up event listeners');
       fabricCanvas.on('object:added', handleCanvasChange);
       fabricCanvas.on('object:modified', handleCanvasChange);
       fabricCanvas.on('object:removed', handleCanvasChange);
       fabricCanvas.on('path:created', handleCanvasChange);
       fabricCanvas.on('mouse:up', handleCanvasChange);
 
+      // Add test object to verify canvas is working
+      const testCircle = new fabric.Circle({
+        radius: 10,
+        fill: 'red',
+        left: 50,
+        top: 50
+      });
+      fabricCanvas.add(testCircle);
+      console.log('Added test circle to canvas');
+
+      // Force a render
+      fabricCanvas.renderAll();
+
       setIsInitialized(true);
       console.log('Canvas initialization complete');
 
       // Cleanup
       return () => {
-        console.log('Cleaning up canvas...');
+        console.log('Running cleanup...');
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
@@ -96,10 +128,12 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           canvasInstanceRef.current.off('mouse:up', handleCanvasChange);
           canvasInstanceRef.current.dispose();
           setIsInitialized(false);
+          console.log('Canvas cleanup complete');
         }
       };
     } catch (error) {
-      console.error('Error initializing canvas:', error);
+      console.error('Error in canvas initialization:', error);
+      setIsInitialized(false);
     }
   }, [width, height, isInitialized]);
 
@@ -111,7 +145,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         height={height}
         style={{
           border: '1px solid #ccc',
-          backgroundColor: '#f9f8f4'
+          backgroundColor: '#f9f8f4',
+          touchAction: 'none'
         }}
       />
     </div>
