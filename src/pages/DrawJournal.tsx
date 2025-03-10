@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
-import { DrawingCanvas } from '@/components/DrawingCanvas';
+import { DrawingCanvas } from '@/components/drawing/DrawingCanvas';
 import { TemplateGenerator, TemplateType } from '@/components/TemplateGenerator';
 import { pageVariants } from '@/components/animations/PageTransition';
 import { formatDate } from '@/utils/dateUtils';
