@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { fabric } from 'fabric';
-import { initializeCanvas, updateBrush, Tool } from '@/utils/canvasOperations';
+import { initializeCanvas, updateBrush, Tool, saveCanvasState, loadDraft } from '@/utils/canvasOperations';
 
 interface DrawingCanvasProps {
   width?: number;
@@ -32,9 +32,42 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     // Set initial brush
     updateBrush(fabricCanvas, 'pen', 2, '#000000');
 
+    // Try to load existing draft
+    const hasDraft = loadDraft(fabricCanvas);
+    if (hasDraft) {
+      console.log('Loaded existing draft');
+    }
+
+    // Set up event listeners for canvas changes
+    const saveTimeout = 1000; // 1 second debounce
+    let timeoutId: NodeJS.Timeout;
+
+    const handleCanvasChange = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        console.log('Saving canvas state after change');
+        saveCanvasState(fabricCanvas);
+      }, saveTimeout);
+    };
+
+    // Add event listeners for all relevant canvas events
+    fabricCanvas.on('object:added', handleCanvasChange);
+    fabricCanvas.on('object:modified', handleCanvasChange);
+    fabricCanvas.on('object:removed', handleCanvasChange);
+    fabricCanvas.on('path:created', handleCanvasChange);
+
     // Cleanup
     return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (canvasInstanceRef.current) {
+        canvasInstanceRef.current.off('object:added', handleCanvasChange);
+        canvasInstanceRef.current.off('object:modified', handleCanvasChange);
+        canvasInstanceRef.current.off('object:removed', handleCanvasChange);
+        canvasInstanceRef.current.off('path:created', handleCanvasChange);
         canvasInstanceRef.current.dispose();
       }
     };
