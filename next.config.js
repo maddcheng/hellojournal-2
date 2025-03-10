@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
-  basePath: '/hello-journal-ai',
+  basePath: '/hellojournal-2',
   images: {
     unoptimized: true,
   },
