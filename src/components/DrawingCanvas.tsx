@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import { DrawingToolbar, DrawingTool } from './DrawingToolbar';
 
@@ -14,154 +14,174 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   className
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+  const canvasInstance = useRef<fabric.Canvas | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [tool, setTool] = useState<DrawingTool>('brush');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [color, setColor] = useState({ h: 0, s: 100, b: 100 });
 
-  // Initialize canvas only once
-  useEffect(() => {
-    if (!canvasRef.current || fabricCanvasRef.current) return;
-
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: '#f9f8f4',
-      isDrawingMode: true,
-      selection: false
-    });
-
-    // Set up initial brush
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = strokeWidth;
-    brush.color = '#000000';
-    brush.strokeLineCap = 'round';
-    brush.strokeLineJoin = 'round';
-    canvas.freeDrawingBrush = brush;
-
-    fabricCanvasRef.current = canvas;
-
-    // Cleanup on unmount
-    return () => {
-      canvas.dispose();
-      fabricCanvasRef.current = null;
-    };
+  // Convert HSB to hex color
+  const getHexColor = useCallback(({ h, s, b }: { h: number; s: number; b: number }): string => {
+    s /= 100;
+    b /= 100;
+    const k = (n: number) => (n + h / 60) % 6;
+    const f = (n: number) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
+    return '#' + [f(5), f(3), f(1)]
+      .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
+      .join('');
   }, []);
 
-  // Handle tool changes
+  // Setup canvas
   useEffect(() => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return;
+    if (!canvasRef.current) return;
 
-    const currentColor = tool === 'eraser' ? '#f9f8f4' : getColorFromHSB(color);
+    // Create canvas instance
+    const canvas = new fabric.Canvas(canvasRef.current);
+    canvas.setDimensions({ width, height });
+    canvas.backgroundColor = '#f9f8f4';
+    canvasInstance.current = canvas;
 
-    switch (tool) {
+    // Set up default brush
+    const brush = new fabric.PencilBrush(canvas);
+    brush.width = strokeWidth;
+    brush.color = getHexColor(color);
+    canvas.freeDrawingBrush = brush;
+
+    // Enable drawing mode by default
+    canvas.isDrawingMode = true;
+
+    return () => {
+      canvas.dispose();
+      canvasInstance.current = null;
+    };
+  }, [width, height]);
+
+  // Handle tool changes
+  const handleToolChange = useCallback((newTool: DrawingTool) => {
+    if (!canvasInstance.current) return;
+    const canvas = canvasInstance.current;
+
+    setTool(newTool);
+
+    // Reset canvas state
+    canvas.discardActiveObject();
+    canvas.getObjects().forEach(obj => {
+      obj.selectable = false;
+      obj.hasControls = false;
+    });
+
+    switch (newTool) {
       case 'brush':
-      case 'eraser':
         canvas.isDrawingMode = true;
-        canvas.selection = false;
         if (canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush.color = getHexColor(color);
           canvas.freeDrawingBrush.width = strokeWidth;
-          canvas.freeDrawingBrush.color = currentColor;
         }
         break;
 
-      case 'lasso':
-      case 'adjust':
-        canvas.isDrawingMode = false;
-        canvas.selection = true;
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = true;
-          obj.hasControls = tool === 'adjust';
-          obj.evented = true;
-        });
+      case 'eraser':
+        canvas.isDrawingMode = true;
+        if (canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush.color = '#f9f8f4';
+          canvas.freeDrawingBrush.width = strokeWidth;
+        }
         break;
 
       case 'image':
         canvas.isDrawingMode = false;
-        canvas.selection = true;
         fileInputRef.current?.click();
+        break;
+
+      case 'lasso':
+        canvas.isDrawingMode = false;
+        canvas.getObjects().forEach(obj => {
+          obj.selectable = true;
+          obj.hasControls = false;
+        });
+        break;
+
+      case 'adjust':
+        canvas.isDrawingMode = false;
+        canvas.getObjects().forEach(obj => {
+          obj.selectable = true;
+          obj.hasControls = true;
+        });
         break;
     }
 
     canvas.requestRenderAll();
-  }, [tool, strokeWidth, color]);
+  }, [color, strokeWidth, getHexColor]);
 
-  // Color conversion utility
-  const getColorFromHSB = (hsb: { h: number; s: number; b: number }): string => {
-    const { h, s, b } = hsb;
-    const k = (n: number) => (n + h / 60) % 6;
-    const f = (n: number) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
-    const r = Math.round(255 * f(5));
-    const g = Math.round(255 * f(3));
-    const bl = Math.round(255 * f(1));
-    return `#${[r, g, bl].map(x => x.toString(16).padStart(2, '0')).join('')}`;
-  };
+  // Handle brush width changes
+  const handleWidthChange = useCallback((width: number) => {
+    setStrokeWidth(width);
+    if (canvasInstance.current?.freeDrawingBrush) {
+      canvasInstance.current.freeDrawingBrush.width = width;
+    }
+  }, []);
+
+  // Handle color changes
+  const handleColorChange = useCallback((newColor: { h: number; s: number; b: number }) => {
+    setColor(newColor);
+    if (canvasInstance.current?.freeDrawingBrush && tool === 'brush') {
+      canvasInstance.current.freeDrawingBrush.color = getHexColor(newColor);
+    }
+  }, [tool, getHexColor]);
 
   // Handle image uploads
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !fabricCanvasRef.current) return;
+    if (!file || !canvasInstance.current) return;
 
-    try {
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const fabricImage = new fabric.Image(img);
+        
+        // Scale image to fit within canvas
+        const scale = Math.min(
+          (width * 0.8) / fabricImage.width!,
+          (height * 0.8) / fabricImage.height!
+        );
 
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.crossOrigin = 'anonymous';
-        image.src = dataUrl;
-      });
+        fabricImage.scale(scale);
+        fabricImage.set({
+          left: (width - fabricImage.width! * scale) / 2,
+          top: (height - fabricImage.height! * scale) / 2,
+          selectable: true,
+          hasControls: true
+        });
 
-      const fabricImage = new fabric.Image(img);
-      
-      // Scale image to fit within canvas
-      const scale = Math.min(
-        (width * 0.8) / fabricImage.width!,
-        (height * 0.8) / fabricImage.height!
-      );
+        canvasInstance.current?.add(fabricImage);
+        canvasInstance.current?.setActiveObject(fabricImage);
+        canvasInstance.current?.requestRenderAll();
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
 
-      fabricImage.scale(scale);
-      fabricImage.set({
-        left: (width - fabricImage.width! * scale) / 2,
-        top: (height - fabricImage.height! * scale) / 2,
-        selectable: true,
-        hasControls: true
-      });
-
-      fabricCanvasRef.current.add(fabricImage);
-      fabricCanvasRef.current.setActiveObject(fabricImage);
-      fabricCanvasRef.current.requestRenderAll();
-
-      // Reset file input
-      event.target.value = '';
-    } catch (error) {
-      console.error('Error loading image:', error);
-    }
-  };
+    // Reset file input
+    event.target.value = '';
+  }, [width, height]);
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-4 p-4">
       <DrawingToolbar
         currentTool={tool}
         brushWidth={strokeWidth}
         brushColor={color}
-        onToolChange={setTool}
-        onBrushWidthChange={setStrokeWidth}
-        onBrushColorChange={setColor}
+        onToolChange={handleToolChange}
+        onBrushWidthChange={handleWidthChange}
+        onBrushColorChange={handleColorChange}
       />
       <div className={className}>
         <canvas
           ref={canvasRef}
           style={{
             border: '1px solid #ccc',
+            borderRadius: '4px',
             touchAction: 'none'
           }}
         />
