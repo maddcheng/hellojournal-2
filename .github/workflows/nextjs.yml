@@ -1,5 +1,6 @@
 name: Deploy Next.js site to Pages
 
+# Trigger new deployment
 on:
   push:
     branches: ["main"]
