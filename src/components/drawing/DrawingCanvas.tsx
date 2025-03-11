@@ -1,27 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { fabric } from 'fabric';
-import { HSBColorPicker } from './HSBColorPicker';
+import { Canvas } from 'fabric';
+import HSBColorPicker from './HSBColorPicker';
 import { ToolButton } from './ToolButton';
-import { CanvasSizeSelector } from './CanvasSizeSelector';
+import CanvasSizeSelector from './CanvasSizeSelector';
 
 interface DrawingCanvasProps {
-  onSave?: (canvas: fabric.Canvas) => void;
+  onSave?: (canvas: Canvas) => void;
   initialData?: string;
+  width?: number;
+  height?: number;
 }
 
-export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onSave, initialData }) => {
+export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ 
+  onSave, 
+  initialData, 
+  width = 800, 
+  height = 600 
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
+  const [fabricCanvas, setFabricCanvas] = useState<Canvas | null>(null);
   const [currentColor, setCurrentColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
   const [tool, setTool] = useState<'brush' | 'eraser'>('brush');
 
   useEffect(() => {
     if (canvasRef.current && !fabricCanvas) {
-      const canvas = new fabric.Canvas(canvasRef.current, {
+      const canvas = new Canvas(canvasRef.current, {
         isDrawingMode: true,
-        width: 800,
-        height: 600,
+        width,
+        height,
         backgroundColor: '#ffffff',
       });
 
@@ -88,11 +95,13 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onSave, initialDat
       <div className="flex gap-4 mb-4">
         <ToolButton
           icon="brush"
+          title="Brush"
           active={tool === 'brush'}
           onClick={() => handleToolChange('brush')}
         />
         <ToolButton
           icon="eraser"
+          title="Eraser"
           active={tool === 'eraser'}
           onClick={() => handleToolChange('eraser')}
         />
